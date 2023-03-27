@@ -2,12 +2,13 @@
 
 This package supports the quantitative comparison of tree topology. This is a beta version release that only
 contains some features, and is actively being developed. Currently, we only support a length based similarity function
-with a max depth parameter =1. We are actively developing code to support other input 
+with a max depth parameter=1. We are actively developing code to support other input 
 parameters.
 
 Installation instructions
 =========================
-conda create -n tree_compare_env python=3.9
+conda create -n tree_compare_env python=3.9  
+conda activate tree_compare_env  
 pip install git+link_to_repo
 
 Scripts
