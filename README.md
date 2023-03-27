@@ -14,7 +14,7 @@ conda activate tree_compare_env
 pip install git+https://github.com/AllenInstitute/tree_comparison.git
 
 NOTE:  
-If the above fails, it's suggested to create a virtual environment with python 3.9 and install lap
+The above was tested and works on Windows. If the above fails, it's suggested to create a virtual environment with python 3.9 and install lap
 from source (instead of PyPi) using the "Install from source" instructions here https://github.com/gatagat/lap.  
 Once installed, then re-try:  
 pip install git+https://github.com/AllenInstitute/tree_comparison.git
@@ -28,8 +28,21 @@ After installation the following console scripts will be available to run from t
 tree_compare
 ----------------------------
 can be run in the following configurations:
-1. give two swc files and compute the tree similarity
-2. give a directory of swc files and compute the tree similarity for all pairs of cells
+1. give two swc files and compute the tree similarity  
+   $ tree_compare  
+    --input_swc_file_1 some/path/to/file1.swc  
+    --input_swc_file_2 some/path/to/file2.swc  
+    --output_file path/to/file_1_file_2_results.csv  
+    --similarity_functions length  
+    --max_depth 1  
+
+  
+2. give a directory of swc files and compute the tree similarity for all pairs of cells  
+   $ tree_compare  
+    --input_swc_dir path/to/directory/  
+    --output_file path/to/results.csv  
+    --similarity_functions length  
+    --max_depth 1
 
 tree_compare_test
 ------------------------------
