@@ -179,8 +179,12 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
 
 def main():
 
-    input_file_1 = files('tree_comparison') / "TestData/Test_Morph_2_50x.swc"
-    input_file_2 = files('tree_comparison') / "TestData/Test_Morph_2_50x.swc"
+    # input_file_1 = files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc"
+    # input_file_2 = files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc"
+        
+    input_file_1 = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\github_projects\tree_comparison\tree_comparison\TestTrees\Test_Morph_2_50x.swc'
+    input_file_2 = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\github_projects\tree_comparison\tree_comparison\TestTrees\Test_Morph_2_50x.swc'
+
     distance = compare_two_trees(input_file_1,
                                   input_file_2,
                                   simFunc="length",
