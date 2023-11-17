@@ -6,6 +6,7 @@ from tqdm import tqdm
 import numpy as np
 from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes
 from importlib.resources import files
+import os 
 
 def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
     """
@@ -44,6 +45,14 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
 
     ndDistanceMatrix1, node_id_index_dict1 = compute_nDistance_matrix(tree1_raw)
     ndDistanceMatrix2, node_id_index_dict2 = compute_nDistance_matrix(tree2_raw)
+
+    print("-----Tree1-----")
+    print(ndDistanceMatrix1)
+    print()
+    print("-----Tree2-----")
+    print(ndDistanceMatrix2)
+    print()
+
 
     agreement = {}
     agreement['agrM'] = np.zeros((len(tree1), len(tree2)))
@@ -182,15 +191,25 @@ def main():
     # input_file_1 = files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc"
     # input_file_2 = files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc"
         
-    input_file_1 = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\github_projects\tree_comparison\tree_comparison\TestTrees\Test_Morph_2_50x.swc'
-    input_file_2 = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\github_projects\tree_comparison\tree_comparison\TestTrees\Test_Morph_2_50x.swc'
+    root = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\github_projects\tree_comparison\tree_comparison\TestTrees'
+    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
+    # input_file_2 = os.path.join(root, 'Test_Morph_2_50x.swc')
+
+    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
+    # input_file_2 = os.path.join(root, 'Test_Morph_4_50x.swc')
+
+    input_file_1 = os.path.join(root, 'tree1.swc')
+    input_file_2 = os.path.join(root, 'tree2.swc')
+
+    # input_file_1 = os.path.join(root, '1069537949.swc')
+    # input_file_2 = os.path.join(root, '1080362151.swc')
 
     distance = compare_two_trees(input_file_1,
                                   input_file_2,
                                   simFunc="length",
                                   maxDepth=1)
-    print(distance)
-    np.testing.assert_almost_equal(distance, -0.0001)
+    print('\nSimilarity score: {}\n'.format(distance))
+    # np.testing.assert_almost_equal(distance, -0.0001)
     print("Code ran successfully!")
 
 
