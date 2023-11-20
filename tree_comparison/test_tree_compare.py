@@ -195,19 +195,21 @@ def main():
     # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
     # input_file_2 = os.path.join(root, 'Test_Morph_2_50x.swc')
 
-    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
-    # input_file_2 = os.path.join(root, 'Test_Morph_4_50x.swc')
+    input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
+    input_file_2 = os.path.join(root, 'Test_Morph_4_50x.swc')
 
-    input_file_1 = os.path.join(root, 'tree1.swc')
-    input_file_2 = os.path.join(root, 'tree2.swc')
+    # input_file_1 = os.path.join(root, 'tree1.swc')
+    # input_file_2 = os.path.join(root, 'tree2.swc')
 
     # input_file_1 = os.path.join(root, '1069537949.swc')
     # input_file_2 = os.path.join(root, '1080362151.swc')
 
+    MD = 2
+
     distance = compare_two_trees(input_file_1,
                                   input_file_2,
                                   simFunc="length",
-                                  maxDepth=1)
+                                  maxDepth=MD)
     print('\nSimilarity score: {}\n'.format(distance))
     # np.testing.assert_almost_equal(distance, -0.0001)
     print("Code ran successfully!")

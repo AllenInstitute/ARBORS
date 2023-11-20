@@ -3,6 +3,8 @@ from morph_utils.graph_traversal import bfs_tree,  dfs_tree, get_path_to_root, g
 from collections import deque
 import lap
 
+from tree_comparison.maxdepthtwo_utils import getValidSetCardinality, getMatchingChildren
+
 def compute_nDistance_matrix(raw_morphology):
     """
     Will get the path distance between all irreducible nodes of a subtree.
@@ -154,7 +156,17 @@ def linearAssignment_matchingNodes(agreement,
 
 
     elif maxDepth == 2:
-        print("To Do")
+
+        validSetDir = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\uygar_tree_comparison\matt_version\uygar_tree_comparison\treeComparison_bitbucket\saveSomeValidSetsResults_6_1_2023'
+        minMaximalSetCardinality1, maxMaximalSetCardinality1, vs1 = getValidSetCardinality(validSetDir, tree1, node1, node1_children)
+        minMaximalSetCardinality2, maxMaximalSetCardinality2, vs2 = getValidSetCardinality(validSetDir, tree2, node2, node2_children)
+        matchingChildren1, matchingChildren2, sim = getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs1, 
+                                                                        maxMaximalSetCardinality2, minMaximalSetCardinality2, vs2,
+                                                                        agreement, node_id_index_dict1, node_id_index_dict2)
+
+
+
+        # print("To Do")
     #     print("sim, maxsimilarity")
     #     print(sim,maxSimilarity)
     if sim > maxSimilarity:
