@@ -1,7 +1,8 @@
 # equivalent to the code in allLevel2Costs.m called in linearAssignment_matchingNodes.m when maxDepth == 2. 
 
 import os
-import lap
+# import lap
+from scipy.optimize import linear_sum_assignment
 import numpy as np
 import scipy.io as sio
 
@@ -29,14 +30,9 @@ def getValidSetCardinality(validSetDir, tree, node, node_children):
 
     """
     Get children node matching info using (pre-geneated) validSet files. 
+    allLevel2Costs.m part 1
     """
-
-    #same as above but when loading matlab validSet file, simplifly_cells = False
-    # validSetDir = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\uygar_tree_comparison\matt_version\uygar_tree_comparison\treeComparison_bitbucket\saveSomeValidSetsResults_6_1_2023'
-    # tree = tree1
-    # node = node1
-    # node_children = node1_children
-
+    
     #get the validset file to load 
     fileName = ''
     maxMaximalSetCardinality = -1
@@ -46,8 +42,6 @@ def getValidSetCardinality(validSetDir, tree, node, node_children):
         maxMaximalSetCardinality = maxMaximalSetCardinality + max(1, len(thisGrandchild))
         fileName = fileName + '_' + str(len(thisGrandchild))
     fileName = os.path.join(validSetDir, fileName + '.mat')
-
-    print(fileName)
 
     # Get node matching info 
     if os.path.isfile(fileName):
@@ -75,11 +69,11 @@ def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs
   
   """
   Find match of tree 1 and tree 2 children that has the highest similarity score. 
+  allLevel2Costs.m part 2
   """
 
   sim = -1e-10
   if minMaximalSetCardinality2 < minMaximalSetCardinality1:
-    print('one')
     for kk in range(minMaximalSetCardinality2,min(minMaximalSetCardinality1,maxMaximalSetCardinality2)+1):
       for kk3 in range(0,len(vs1[minMaximalSetCardinality1][0][0])): #for num sets in vs1 Choose minMaximalSetCardinality1
         for kk4 in range(0,len(vs2[kk][0][0])):                      #for num sets in vs2 Choose kk 
@@ -88,11 +82,15 @@ def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs
                                                   [node_id_index_dict2[x] for x in vs2[kk][0][0][kk4]])]
             mat_shape = lap_submat.shape
             if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0])
-            thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
-            thisSim = thisSim * -1
-            print('ran lap one')
-            print('thisSim: ', thisSim)
-            print('rowsol: ', rowsol)
+
+            #Scipy lap
+            x, rowsol = linear_sum_assignment(-lap_submat)
+            thisSim = lap_submat[x, rowsol].sum()
+
+            # #Original lap 
+            # thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
+            # thisSim = thisSim * -1
+
             if thisSim > sim:
               if minMaximalSetCardinality1 > kk:
                 sim = thisSim
@@ -103,23 +101,24 @@ def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs
                 matchingChildren1 = [n for n in vs1[minMaximalSetCardinality1][0][0][kk3]]
                 matchingChildren2 = [n for n in vs2[kk][0][0][kk4][rowsol]]
   else:
-    print('two')
     for kk in range(minMaximalSetCardinality1,min(minMaximalSetCardinality2,maxMaximalSetCardinality1)+1):
-      print('kk: ', kk)
       for kk3 in range(0,len(vs1[kk][0][0])):
-        print('kk3: ', kk3)
         for kk4 in range(0,len(vs2[minMaximalSetCardinality2][0][0])):      
-          print('kk4: ', kk4)
           if vs1[kk][0][1][kk3][0] or vs2[minMaximalSetCardinality2][0][1][kk4][0]: #if either set pulls nodes from all main subtrees, run lap
             lap_submat = agreement['pAgrM'][np.ix_([node_id_index_dict1[x] for x in vs1[kk][0][0][kk3]],
                                                   [node_id_index_dict2[x] for x in vs2[minMaximalSetCardinality2][0][0][kk4]])]
             mat_shape = lap_submat.shape
-            if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0])
-            thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
-            thisSim = thisSim * -1
-            print('ran lap two')
-            print('thisSim: ', thisSim)
-            print('rowsol: ', rowsol)
+            if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0]) #TODO need this?
+
+            #Scipy lap
+            x, rowsol = linear_sum_assignment(-lap_submat)
+            thisSim = lap_submat[x, rowsol].sum()
+
+            # #Original lap 
+            # thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
+            # # thisSim, _, rowsol = lap.lapjv(-lap_submat.T, extend_cost=True)
+            # thisSim = thisSim * -1
+
             if thisSim > sim:
               if minMaximalSetCardinality2 < kk:
                 sim = thisSim
@@ -130,20 +129,28 @@ def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs
                 matchingChildren1 = [n for n in vs1[kk][0][0][kk3]]
                 matchingChildren2 = [n for n in vs2[minMaximalSetCardinality2][0][0][kk4][rowsol]]
 
-  for kk in range(max(minMaximalSetCardinality1,minMaximalSetCardinality2)+1, min(maxMaximalSetCardinality1,maxMaximalSetCardinality2)):
+  for kk in range(max(minMaximalSetCardinality1,minMaximalSetCardinality2)+1, min(maxMaximalSetCardinality1,maxMaximalSetCardinality2)+1):
     for kk3 in range(0, len(vs1[kk][0][0])): 
       for kk4 in range(0, len(vs2[kk][0][0])):
-        if vs1[kk][0][1][kk3][0] or vs2[kk][0][1][kk4][0]: #if either set pulls nodes from all main subtrees, run lap
+        if vs1[kk][0][1][kk3][0] or vs2[kk][0][1][kk4][0]: #if either set pulls nodes from all main subtrees, run lap          
           lap_submat = agreement['pAgrM'][np.ix_([node_id_index_dict1[x] for x in vs1[kk][0][0][kk3]],
                                                 [node_id_index_dict2[x] for x in vs2[kk][0][0][kk4]])]
           mat_shape = lap_submat.shape
-          if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0])
-          thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
-          thisSim = thisSim * -1
-          print('ran lap down here')
+          if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0]) #TODO do we need this?
+
+          #Scipy lap
+          x, rowsol = linear_sum_assignment(-lap_submat)
+          thisSim = lap_submat[x, rowsol].sum()
+
+          # #Original lap 
+          # thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
+          # thisSim = thisSim * -1
+
           if thisSim > sim: 
             sim = thisSim 
             matchingChildren1 = [n for n in vs1[kk][0][0][kk3]]
-            matchingChildren2 = [n for n in vs1[kk][0][0][kk4][rowsol]]
+            matchingChildren2 = [n for n in vs2[kk][0][0][kk4][rowsol]]
+
+
 
   return matchingChildren1,matchingChildren2,sim

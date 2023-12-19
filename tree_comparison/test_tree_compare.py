@@ -46,18 +46,10 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
     ndDistanceMatrix1, node_id_index_dict1 = compute_nDistance_matrix(tree1_raw)
     ndDistanceMatrix2, node_id_index_dict2 = compute_nDistance_matrix(tree2_raw)
 
-    print("-----Tree1-----")
-    print(ndDistanceMatrix1)
-    print()
-    print("-----Tree2-----")
-    print(ndDistanceMatrix2)
-    print()
-
-
     agreement = {}
     agreement['agrM'] = np.zeros((len(tree1), len(tree2)))
     agreement['pAgrM'] = np.zeros((len(tree1),
-                                   len(tree2)))  # question uygar has  agreement.pAgrM = agreement.agrM; in matlab does that link them??
+                                   len(tree2)))  # question uygar has agreement.pAgrM = agreement.agrM; in matlab does that link them??
     agreement['agrTypeM'] = np.zeros((len(tree1), len(tree2)), dtype=bool)
     agreement['agrNodes'] = np.empty((len(tree1), len(tree2)), dtype=list)
     agreement['pAgrNodes'] = np.empty((len(tree1), len(tree2)), dtype=list)
@@ -77,10 +69,7 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
 
             node2_children = tree2.get_children(node2)
             node_2_matrix_index = node_id_index_dict2[node2['id']]
-            #         print("----------")
-            #         print(node_1_matrix_index,node_2_matrix_index)
-            #         print()
-
+        
             if node1 != root1:
                 node1_parent_id = node1['parent']
                 node1_parent_id_matrix_idx = node_id_index_dict1[node1_parent_id]
@@ -97,9 +86,7 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
 
                 subtreeRootPos1 = np.where(preOrderNodes1[:, 0] == node1['id'])[0][0]
                 subtreeRootPos2 = np.where(preOrderNodes2[:, 0] == node2['id'])[0][0]
-                #             print("~~")
-                #             print(subtreeRootPos1,subtreeRootPos2)
-                #             print("~~")
+
                 # plus one to get all members below (matlab v python)
                 stop_index_1 = subtreeRootPos1 + preOrderNodes1[subtreeRootPos1, 1] + 1
                 stop_index_2 = subtreeRootPos2 + preOrderNodes2[subtreeRootPos2, 1] + 1
@@ -107,8 +94,6 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
                 preON1 = preOrderNodes1[subtreeRootPos1: stop_index_1, :]
                 preON2 = preOrderNodes2[subtreeRootPos2: stop_index_2, :]
 
-                # print("Calling lap at {},{}".format(node_1_matrix_index,node_2_matrix_index))
-                #             print(agreement['agrTypeM'])
                 linearAssignment_matchingNodes(agreement,
                                                node1,
                                                node1_children,
@@ -139,8 +124,6 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
                     leaves2_matrix_indices = [node_id_index_dict2[leaf['id']] for leaf in leaves2]
 
                     if simFunc == "length":
-
-                        #                     agreement['agrM'][node_1_matrix_index,node_2_matrix_index] = 0
                         sub_arr_1 = ndDistanceMatrix1[leaves1_matrix_indices, node1_parent_id_matrix_idx]
                         sub_arr_2 = ndDistanceMatrix2[leaves2_matrix_indices, node2_parent_id_matrix_idx]
 
@@ -151,14 +134,12 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
                         lowerNode2 = leaves2[pos2]
 
                         min_dist = min([maxHeight1, maxHeight2])
-                        #                     print("MinDist:")
-                        #                     print(min_dist)
-                        # print("Updating pAgrM via min_dist at {},{} to: {}".format(node_1_matrix_index,node_2_matrix_index,min_dist))
                         agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = min_dist
 
 
                     else:
                         print("TO DO: OTHER SIM FUNC")
+
                         return None
 
                     #                 agreement.pAgrNodes{node1}{node2}{1} = lowerNode1; agreement.pAgrNodes{node1}{node2}{2} = lowerNode2;
@@ -192,24 +173,37 @@ def main():
     # input_file_2 = files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc"
         
     root = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\github_projects\tree_comparison\tree_comparison\TestTrees'
-    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
-    # input_file_2 = os.path.join(root, 'Test_Morph_2_50x.swc')
 
-    input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
-    input_file_2 = os.path.join(root, 'Test_Morph_4_50x.swc')
+
+    input_file_1 = os.path.join(root, '1069537949.swc')
+    input_file_2 = os.path.join(root, '1080362151.swc')
+
+    # input_file_1 = os.path.join(root, '1069537949.swc')
+    # input_file_2 = os.path.join(root, '1069537949.swc')
+
+    # input_file_1 = os.path.join(root, '1080362151.swc')
+    # input_file_2 = os.path.join(root, '1080362151.swc')
 
     # input_file_1 = os.path.join(root, 'tree1.swc')
     # input_file_2 = os.path.join(root, 'tree2.swc')
 
-    # input_file_1 = os.path.join(root, '1069537949.swc')
-    # input_file_2 = os.path.join(root, '1080362151.swc')
+    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x_ext.swc')
+    # input_file_2 = os.path.join(root, 'Test_Morph_4_50x_ext.swc')
 
-    MD = 2
+    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
+    # input_file_2 = os.path.join(root, 'Test_Morph_4_50x.swc')
+
+    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
+    # input_file_2 = os.path.join(root, 'Test_Morph_2_50x.swc')
+
+
+    md = 2
+    sf = "length"
 
     distance = compare_two_trees(input_file_1,
                                   input_file_2,
-                                  simFunc="length",
-                                  maxDepth=MD)
+                                  simFunc=sf,
+                                  maxDepth=md)
     print('\nSimilarity score: {}\n'.format(distance))
     # np.testing.assert_almost_equal(distance, -0.0001)
     print("Code ran successfully!")
