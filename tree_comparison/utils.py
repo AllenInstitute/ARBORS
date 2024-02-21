@@ -1,10 +1,10 @@
 import numpy as np
-from morph_utils.graph_traversal import bfs_tree,  dfs_tree, get_path_to_root, get_path_and_path_dist_between_two_nodes
 from collections import deque
-import lap
 from scipy.optimize import linear_sum_assignment
-
+from morph_utils.graph_traversal import bfs_tree,  dfs_tree, get_path_to_root, get_path_and_path_dist_between_two_nodes
 from tree_comparison.maxdepthtwo_utils import getValidSetCardinality, getMatchingChildren
+from convexsimfunc_utils import edges_between
+from quantized_convex_matching import quantized_convex_matching
 
 def compute_nDistance_matrix(raw_morphology):
     """
@@ -55,7 +55,6 @@ def compute_nDistance_matrix(raw_morphology):
 
     return ndist_matrix, node_id_index_dict
 
-
 def preOrderTraversal(morphology, st_node):
     """
     Remember we are returning node ids where as Uygars code returns node indicies
@@ -84,7 +83,6 @@ def find_leaves(morphology, st_node):
     leaves = [n for n in nodes_down if morphology.get_children(n)==[]]
     return leaves
 
-
 def linearAssignment_matchingNodes(agreement,
                                    node1,
                                    node1_children,
@@ -100,10 +98,10 @@ def linearAssignment_matchingNodes(agreement,
                                    preON2,
                                    tree2,
                                    node_id_index_dict2,
-                                   maxDepth=1,
-                                   simFunc='length'):
-    node_1_matrix_idx = node_id_index_dict1[node1['id']]  # redundant, defined outside funcrtion
-    node_2_matrix_idx = node_id_index_dict2[node2['id']]  # redundant, defined outside funcrtion
+                                   tree1_paths, 
+                                   tree2_paths,
+                                   maxDepth,
+                                   simFunc):
 
     node1_children_array = np.array(node1_children)
     node2_children_array = np.array(node2_children)
@@ -123,13 +121,11 @@ def linearAssignment_matchingNodes(agreement,
     maxChild1 = np.argmax(sub_mat_2)
     maxSimilarity2 = sub_mat_2[maxChild1]
 
-    child1Node2 = True
     if maxSimilarity2 > maxSimilarity:
         maxSimilarity = maxSimilarity2
         maxMatch1 = node1_children[maxChild1]
         maxMatch2 = node2
     else:
-        child1Node2 = False
         maxMatch1 = node1
         maxMatch2 = node2_children[maxChild2]
 
@@ -138,13 +134,8 @@ def linearAssignment_matchingNodes(agreement,
         mat_shape = lap_submat.shape
         if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0])
 
-        #Scipy lap
         x, rowsol = linear_sum_assignment(-lap_submat)
         sim = lap_submat[x, rowsol].sum()
-
-        # #Original lap 
-        # sim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
-        # sim = -1 * sim
 
         if len(node2_children) < len(node1_children):
             matchingChildren1 = node1_children_array[rowsol]
@@ -153,22 +144,14 @@ def linearAssignment_matchingNodes(agreement,
             matchingChildren1 = node1_children
             matchingChildren2 = node2_children_array[rowsol]
 
-        matchingChildren1_matrix_idx = [node_id_index_dict1[n['id']] for n in matchingChildren1]
-        matchingChildren2_matrix_idx = [node_id_index_dict2[n['id']] for n in matchingChildren2]
-
-
-
     elif maxDepth == 2:
-
-        validSetDir = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\uygar_tree_comparison\matt_version\uygar_tree_comparison\treeComparison_bitbucket\saveSomeValidSetsResults_6_1_2023'
+        # validSetDir = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\uygar_tree_comparison\matt_version\uygar_tree_comparison\treeComparison_bitbucket\saveSomeValidSetsResults_6_1_2023'
+        validSetDir = r'//allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/uygar_tree_comparison/matt_version/uygar_tree_comparison/treeComparison_bitbucket/saveSomeValidSetsResults_6_1_2023'
         minMaximalSetCardinality1, maxMaximalSetCardinality1, vs1 = getValidSetCardinality(validSetDir, tree1, node1, node1_children)
         minMaximalSetCardinality2, maxMaximalSetCardinality2, vs2 = getValidSetCardinality(validSetDir, tree2, node2, node2_children)
         matchingChildren1, matchingChildren2, sim = getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs1, 
                                                                         maxMaximalSetCardinality2, minMaximalSetCardinality2, vs2,
                                                                         agreement, node_id_index_dict1, node_id_index_dict2) 
-
-        matchingChildren1_matrix_idx = [node_id_index_dict1[n] for n in matchingChildren1]
-        matchingChildren2_matrix_idx = [node_id_index_dict2[n] for n in matchingChildren2]
 
     if sim > maxSimilarity:
         agreement['agrM'][node1_matrix_idx, node2_matrix_idx] = sim
@@ -206,15 +189,13 @@ def linearAssignment_matchingNodes(agreement,
             n1_parent_id_idx = node_id_index_dict1[n1_parent_id]
 
             for kk2 in range(len(preON2[:, 0])):
-
                 n2 = preON2[kk2, 0]
-
                 n2_parent_id = tree2.node_by_id(n2)['parent']
                 n2_parent_id_idx = node_id_index_dict2[n2_parent_id]
 
                 n1_idx = node_id_index_dict1[n1]
                 n2_idx = node_id_index_dict2[n2]
-
+                
                 if agreement['agrTypeM'][n1_idx, n2_idx]:
 
                     min_val = min(ndDistanceMatrix1[n1_idx, node1_parent_id_matrix_idx],
@@ -225,29 +206,17 @@ def linearAssignment_matchingNodes(agreement,
                     simpleBound2 = agreement['pAgrM'][n1_idx, n2_idx] + max_val
 
                     if (n1 == node1['id'] & n2 == node2['id']) or (maxPlusSimilarity < (min(simpleBound, simpleBound2) * 0.9999)):
+                        if simFunc != "length": #convex
+                            edge_lengths1, edge_orientations1, edge_areas1, pillars1 = edges_between(tree1.node_by_id(n1), tree1.node_by_id(node1['parent']), tree1, tree1_paths)
+                            edge_lengths2, edge_orientations2, edge_areas2, pillars2 = edges_between(tree2.node_by_id(n2), tree2.node_by_id(node2['parent']), tree2, tree2_paths)
+                            cvxSim = quantized_convex_matching(edge_lengths1, edge_orientations1, edge_areas1, pillars1, edge_lengths2, edge_orientations2, edge_areas2, pillars2)
+                            thisPlusSimilarity = agreement['agrM'][n1_idx, n2_idx] + cvxSim
 
-                        if simFunc != "length": #CONVEX
-                            print("TODO")
-
-                            # MATLAB: 
-                            # [edgeLengths1, edgeOrientations1, edgeAreas1,pillars1] = edges_between(n1,tree1{node1}{1},tree1);
-                            # [edgeLengths2, edgeOrientations2, edgeAreas2,pillars2] = edges_between(n2,tree2{node2}{1},tree2);
-                            # cvxSim = quantizedConvexMatching_mex(edgeLengths1,edgeOrientations1,edgeAreas1,pillars1,edgeLengths2,edgeOrientations2,edgeAreas2,pillars2);
-                            # thisPlusSimilarity = agreement.agrM(n1,n2) + cvxSim;
-
-
-                        else:
+                        else: #length 
                             thisPlusSimilarity = simpleBound
-                        if (thisPlusSimilarity > maxPlusSimilarity):
+                        if (thisPlusSimilarity > maxPlusSimilarity): 
                             maxPlusSimilarity = thisPlusSimilarity
-                            maxndd1 = n1
-                            maxndd2 = n2
 
                     else:
                         kk2 = kk2 + preON2[kk2, 1]
-        #         maxndd1_matrix_idx = node_id_index_dict1[maxndd1]
-        #         maxndd2_matrix_idx = node_id_index_dict2[maxndd2]
-        # print("Updating agreement['pAgrM'] in lap at {},{} to: {}".format(node1_matrix_idx,node2_matrix_idx,maxPlusSimilarity))
-        agreement['pAgrM'][node1_matrix_idx, node2_matrix_idx] = maxPlusSimilarity;
-#         agreement['pAgrNodes'][node1_matrix_idx,node2_matrix_idx][0] = agreement['agrNodes'][maxndd1_matrix_idx][maxndd2_matrix_idx][0];
-#         agreement['pAgrNodes'][node1_matrix_idx,node2_matrix_idx][1] = agreement['agrNodes'][maxndd1_matrix_idx][maxndd2_matrix_idx][1];
+        agreement['pAgrM'][node1_matrix_idx, node2_matrix_idx] = maxPlusSimilarity
