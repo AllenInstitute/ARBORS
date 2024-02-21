@@ -7,7 +7,7 @@ tree_comparison.egg-info
 *.swc
 *.pdf
 *.ipynb
-
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

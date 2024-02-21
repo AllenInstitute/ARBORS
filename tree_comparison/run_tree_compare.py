@@ -1,14 +1,17 @@
+import os
+import numpy as np
 import pandas as pd
+from math import pi
+import argschema as ags
+from tqdm import tqdm
+import itertools
 from neuron_morphology.swc_io import morphology_from_swc
 from morph_utils.modifications import generate_irreducible_morph
 from morph_utils.graph_traversal import dfs_tree
 from morph_utils.measurements import tree_length
-import os
-from tqdm import tqdm
-import numpy as np
-import argschema as ags
-import itertools
 from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes
+from convexsimfunc_utils import get_tree_paths, edges_between
+from quantized_convex_matching import quantized_convex_matching
 
 class IO_Schema(ags.ArgSchema):
     input_swc_file_1 = ags.fields.InputFile(
@@ -27,13 +30,11 @@ class IO_Schema(ags.ArgSchema):
         allow_none=True
     )
     output_file = ags.fields.OutputFile(description="Path to output csv", default="TreeCompareOutput.csv")
-    similarity_functions = ags.fields.String(description = "Similarity function to use. Options: 'length or convex'",
-                                             default='length')
-    max_depth = ags.fields.Int(description="Max depth to use for algorithm",
-                               default=1)
+    similarity_function = ags.fields.String(description = "Similarity function to use. Options: 'length or convex'", default='length')
+    max_depth = ags.fields.Int(description="Max depth to use for algorithm", default=1)
 
 
-def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
+def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, angle_threshold=pi/9, partition_length=1/2000, segment_threshold=1/200):
     """
     Will generate a similarirty score for two input swc files.
 
@@ -41,9 +42,11 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
     :param swc_file_2: str, path to swc file 2
     :param simFunc: str, either 'length' or 'convex'
     :param maxDepth: int, 1 or 2
+    :param angle_threshold: if angle between nodes is less than this, drop nodes here(?) currently unused. (for resampling a branch)
+    :param partition_length: length between resampled nodes (for resampling a branch)
+    :param segment_threshold: microns if segment is longer than this...? (for resampling a branch)
     :return: float, cell similarity
     """
-
     tree1_raw = morphology_from_swc(swc_file_1)
     tree2_raw = morphology_from_swc(swc_file_2)
 
@@ -55,26 +58,31 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
 
     root1, root2 = tree1.get_soma(), tree2.get_soma()
 
-    if not root1:
-        root1 = [n for n in tree1.nodes() if n['parent'] == -1][0]
-    if not root2:
-        root2 = [n for n in tree2.nodes() if n['parent'] == -1][0]
+    if not root1: root1 = [n for n in tree1.nodes() if n['parent'] == -1][0]
+    if not root2: root2 = [n for n in tree2.nodes() if n['parent'] == -1][0]
 
-    postOrderNodes2,_ = dfs_tree(tree2, root2)
-    postOrderNodes2.reverse()
     postOrderNodes1,_ = dfs_tree(tree1, root1)
     postOrderNodes1.reverse()
+    postOrderNodes2,_ = dfs_tree(tree2, root2)
+    postOrderNodes2.reverse()
 
     preOrderNodes1 = preOrderTraversal(tree1, root1)
     preOrderNodes2 = preOrderTraversal(tree2, root2)
+
+    partition_length_tree1 = partition_length*tree1_length 
+    segment_threshold_tree1 = segment_threshold*tree1_length
+    partition_length_tree2 = partition_length*tree2_length 
+    segment_threshold_tree2 = segment_threshold*tree2_length
+
+    tree1_paths = get_tree_paths(tree1_raw, partition_length_tree1)
+    tree2_paths = get_tree_paths(tree2_raw, partition_length_tree2)
 
     ndDistanceMatrix1, node_id_index_dict1 = compute_nDistance_matrix(tree1_raw)
     ndDistanceMatrix2, node_id_index_dict2 = compute_nDistance_matrix(tree2_raw)
 
     agreement = {}
     agreement['agrM'] = np.zeros((len(tree1), len(tree2)))
-    agreement['pAgrM'] = np.zeros((len(tree1),
-                                   len(tree2)))  # question uygar has  agreement.pAgrM = agreement.agrM; in matlab does that link them??
+    agreement['pAgrM'] = np.zeros((len(tree1), len(tree2))) 
     agreement['agrTypeM'] = np.zeros((len(tree1), len(tree2)), dtype=bool)
     agreement['agrNodes'] = np.empty((len(tree1), len(tree2)), dtype=list)
     agreement['pAgrNodes'] = np.empty((len(tree1), len(tree2)), dtype=list)
@@ -91,13 +99,9 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
         node_1_matrix_index = node_id_index_dict1[node1['id']]
 
         for node2 in postOrderNodes2:
-
             node2_children = tree2.get_children(node2)
             node_2_matrix_index = node_id_index_dict2[node2['id']]
-            #         print("----------")
-            #         print(node_1_matrix_index,node_2_matrix_index)
-            #         print()
-
+        
             if node1 != root1:
                 node1_parent_id = node1['parent']
                 node1_parent_id_matrix_idx = node_id_index_dict1[node1_parent_id]
@@ -114,9 +118,7 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
 
                 subtreeRootPos1 = np.where(preOrderNodes1[:, 0] == node1['id'])[0][0]
                 subtreeRootPos2 = np.where(preOrderNodes2[:, 0] == node2['id'])[0][0]
-                #             print("~~")
-                #             print(subtreeRootPos1,subtreeRootPos2)
-                #             print("~~")
+
                 # plus one to get all members below (matlab v python)
                 stop_index_1 = subtreeRootPos1 + preOrderNodes1[subtreeRootPos1, 1] + 1
                 stop_index_2 = subtreeRootPos2 + preOrderNodes2[subtreeRootPos2, 1] + 1
@@ -124,8 +126,6 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
                 preON1 = preOrderNodes1[subtreeRootPos1: stop_index_1, :]
                 preON2 = preOrderNodes2[subtreeRootPos2: stop_index_2, :]
 
-                # print("Calling lap at {},{}".format(node_1_matrix_index,node_2_matrix_index))
-                #             print(agreement['agrTypeM'])
                 linearAssignment_matchingNodes(agreement,
                                                node1,
                                                node1_children,
@@ -141,8 +141,10 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
                                                preON2,
                                                tree2,
                                                node_id_index_dict2,
+                                               tree1_paths, 
+                                               tree2_paths,
                                                maxDepth=maxDepth,
-                                               simFunc='length')
+                                               simFunc=simFunc)
 
 
             else:
@@ -156,8 +158,6 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
                     leaves2_matrix_indices = [node_id_index_dict2[leaf['id']] for leaf in leaves2]
 
                     if simFunc == "length":
-
-                        #                     agreement['agrM'][node_1_matrix_index,node_2_matrix_index] = 0
                         sub_arr_1 = ndDistanceMatrix1[leaves1_matrix_indices, node1_parent_id_matrix_idx]
                         sub_arr_2 = ndDistanceMatrix2[leaves2_matrix_indices, node2_parent_id_matrix_idx]
 
@@ -168,33 +168,38 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc = "length", maxDepth = 1):
                         lowerNode2 = leaves2[pos2]
 
                         min_dist = min([maxHeight1, maxHeight2])
-                        #                     print("MinDist:")
-                        #                     print(min_dist)
-                        # print("Updating pAgrM via min_dist at {},{} to: {}".format(node_1_matrix_index,node_2_matrix_index,min_dist))
                         agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = min_dist
 
 
-                    else:
-                        print("TO DO: OTHER SIM FUNC")
-                        return None
+                    else: #convex
+                        cvxSim = -1e-10
+                        for leaf1 in leaves1:
+                            sub_arr_1 = ndDistanceMatrix1[node_id_index_dict1[leaf1['id']], node1_parent_id_matrix_idx]
+                            
+                            for leaf2 in leaves2:
+                                sub_arr_2 = ndDistanceMatrix2[node_id_index_dict2[leaf2['id']], node2_parent_id_matrix_idx]
+                                
+                                if min(sub_arr_1, sub_arr_2) > cvxSim:
+                                    edge_lengths1, edge_orientations1, edge_areas1, pillars1 = edges_between(leaf1, tree1.node_by_id(node1['parent']), tree1, tree1_paths)
+                                    edge_lengths2, edge_orientations2, edge_areas2, pillars2 = edges_between(leaf2, tree2.node_by_id(node2['parent']), tree2, tree2_paths)
+                                    thisCvxSim = quantized_convex_matching(edge_lengths1, edge_orientations1, edge_areas1, pillars1, edge_lengths2, edge_orientations2, edge_areas2, pillars2)
 
-                    #                 agreement.pAgrNodes{node1}{node2}{1} = lowerNode1; agreement.pAgrNodes{node1}{node2}{2} = lowerNode2;
-                    #                 agreement.agrNodes{node1}{node2}{1}=lowerNode1; agreement.agrNodes{node1}{node2}{2}=lowerNode2;
-                    del lowerNode1;
-                    del lowerNode2;
-                    agreement['agrTypeM'][node_1_matrix_index, node_2_matrix_index] = (
-                            (node1 in leaves1) and (node2 in leaves2))
+                                    if thisCvxSim > cvxSim:
+                                        cvxSim = thisCvxSim
+                                        lowerNode1 = leaf1
+                                        lowerNode2 = leaf2
+
+                        agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = cvxSim
+
+                    del lowerNode1
+                    del lowerNode2
+                    agreement['agrTypeM'][node_1_matrix_index, node_2_matrix_index] = ((node1 in leaves1) and (node2 in leaves2))
                 else:
-                    # print("Updating pAgrM via line 99 at {},{} to: 0".format(node_1_matrix_index,node_2_matrix_index))
                     agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = 0
-                    #                 agreement.agrNodes{node1}{node2}{1}=node1; agreement.agrNodes{node1}{node2}{2}=node2;
-                    #                 agreement.pAgrNodes{node1}{node2}{1}=node1; agreement.pAgrNodes{node1}{node2}{2}=node2;
                     agreement['agrTypeM'][node_1_matrix_index, node_2_matrix_index] = False
 
             if agreement['agrM'][node_1_matrix_index, node_2_matrix_index] > maxAgreement:
                 maxAgreement = agreement['agrM'][node_1_matrix_index, node_2_matrix_index]
-                maxMatchingNode1 = node1;
-                maxMatchingNode2 = node2;
 
     maxAgreement = round(maxAgreement, 4)
     distance = tree1_length + tree2_length - maxAgreement
@@ -232,7 +237,7 @@ def main(args):
 
             distance = compare_two_trees(swc_fn_1,
                                          swc_fn_2,
-                                         simFunc=args['similarity_functions'],
+                                         simFunc=args['similarity_function'],
                                          maxDepth=args['max_depth'])
             res_dict = {
                 "file1": swc_fn_1,
@@ -251,7 +256,7 @@ def main(args):
 
         distance = compare_two_trees(input_file_1,
                                       input_file_2,
-                                      simFunc=args['similarity_functions'],
+                                      simFunc=args['similarity_function'],
                                       maxDepth=args['max_depth'])
 
         results = [{"file1":input_file_1, "file2":input_file_2, "similarity":distance }]

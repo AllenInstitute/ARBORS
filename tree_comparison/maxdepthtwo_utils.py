@@ -1,11 +1,9 @@
 # equivalent to the code in allLevel2Costs.m called in linearAssignment_matchingNodes.m when maxDepth == 2. 
 
 import os
-# import lap
 from scipy.optimize import linear_sum_assignment
 import numpy as np
 import scipy.io as sio
-
 
 def postOrderTraversalWithOptions(nodeNumber,tree,currentDepth,maxDepth):
     #get all descendents of this node in the tree from currentDepth down to maxDepth 
@@ -62,7 +60,6 @@ def getValidSetCardinality(validSetDir, tree, node, node_children):
 
     return minMaximalSetCardinality, maxMaximalSetCardinality, vs
 
-
 def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs1, 
                        maxMaximalSetCardinality2, minMaximalSetCardinality2, vs2, 
                        agreement, node_id_index_dict1, node_id_index_dict2):
@@ -83,13 +80,8 @@ def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs
             mat_shape = lap_submat.shape
             if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0])
 
-            #Scipy lap
             x, rowsol = linear_sum_assignment(-lap_submat)
             thisSim = lap_submat[x, rowsol].sum()
-
-            # #Original lap 
-            # thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
-            # thisSim = thisSim * -1
 
             if thisSim > sim:
               if minMaximalSetCardinality1 > kk:
@@ -108,16 +100,10 @@ def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs
             lap_submat = agreement['pAgrM'][np.ix_([node_id_index_dict1[x] for x in vs1[kk][0][0][kk3]],
                                                   [node_id_index_dict2[x] for x in vs2[minMaximalSetCardinality2][0][0][kk4]])]
             mat_shape = lap_submat.shape
-            if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0]) #TODO need this?
+            if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0]) 
 
-            #Scipy lap
             x, rowsol = linear_sum_assignment(-lap_submat)
             thisSim = lap_submat[x, rowsol].sum()
-
-            # #Original lap 
-            # thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
-            # # thisSim, _, rowsol = lap.lapjv(-lap_submat.T, extend_cost=True)
-            # thisSim = thisSim * -1
 
             if thisSim > sim:
               if minMaximalSetCardinality2 < kk:
@@ -136,21 +122,14 @@ def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs
           lap_submat = agreement['pAgrM'][np.ix_([node_id_index_dict1[x] for x in vs1[kk][0][0][kk3]],
                                                 [node_id_index_dict2[x] for x in vs2[kk][0][0][kk4]])]
           mat_shape = lap_submat.shape
-          if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0]) #TODO do we need this?
+          if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0])
 
-          #Scipy lap
           x, rowsol = linear_sum_assignment(-lap_submat)
           thisSim = lap_submat[x, rowsol].sum()
-
-          # #Original lap 
-          # thisSim, _, rowsol = lap.lapjv(-lap_submat, extend_cost=True)
-          # thisSim = thisSim * -1
 
           if thisSim > sim: 
             sim = thisSim 
             matchingChildren1 = [n for n in vs1[kk][0][0][kk3]]
             matchingChildren2 = [n for n in vs2[kk][0][0][kk4][rowsol]]
-
-
 
   return matchingChildren1,matchingChildren2,sim
