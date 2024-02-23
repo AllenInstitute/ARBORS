@@ -11,7 +11,7 @@ from morph_utils.graph_traversal import dfs_tree
 from morph_utils.measurements import tree_length
 from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes
 from convexsimfunc_utils import get_tree_paths, edges_between
-from quantized_convex_matching import quantized_convex_matching
+from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
 class IO_Schema(ags.ArgSchema):
     input_swc_file_1 = ags.fields.InputFile(
@@ -33,8 +33,11 @@ class IO_Schema(ags.ArgSchema):
     similarity_function = ags.fields.String(description = "Similarity function to use. Options: 'length or convex'", default='length')
     max_depth = ags.fields.Int(description="Max depth to use for algorithm", default=1)
 
+    partition_length = ags.fields.Float(description="Partition length for downsampling tree branch", default=1/2000)
+    angle_threshold = ags.fields.Float(description="Angle threshold for downsampling tree branch", default=pi/9)
+    segment_threshold = ags.fields.Float(description="Segment threshold for downsampling tree branch", default=1/200)
 
-def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, angle_threshold=pi/9, partition_length=1/2000, segment_threshold=1/200):
+def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, partition_length, angle_threshold, segment_threshold):
     """
     Will generate a similarirty score for two input swc files.
 
@@ -238,7 +241,11 @@ def main(args):
             distance = compare_two_trees(swc_fn_1,
                                          swc_fn_2,
                                          simFunc=args['similarity_function'],
-                                         maxDepth=args['max_depth'])
+                                         maxDepth=args['max_depth'],
+                                         partition_length=args['partition_length'],
+                                         angle_threshold=args['angle_threshold'],
+                                         segment_threshold=args['segment_threshold'])
+
             res_dict = {
                 "file1": swc_fn_1,
                 "file2": swc_fn_2,
@@ -257,7 +264,10 @@ def main(args):
         distance = compare_two_trees(input_file_1,
                                       input_file_2,
                                       simFunc=args['similarity_function'],
-                                      maxDepth=args['max_depth'])
+                                      maxDepth=args['max_depth'],
+                                      partition_length=args['partition_length'],
+                                      angle_threshold=args['angle_threshold'],
+                                      segment_threshold=args['segment_threshold'])
 
         results = [{"file1":input_file_1, "file2":input_file_2, "similarity":distance }]
 

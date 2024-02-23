@@ -9,7 +9,7 @@ from morph_utils.graph_traversal import dfs_tree
 from morph_utils.measurements import tree_length
 from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes
 from convexsimfunc_utils import get_tree_paths, edges_between
-from quantized_convex_matching import quantized_convex_matching
+from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
 
 def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, angle_threshold=pi/9, partition_length=1/2000, segment_threshold=1/200):
@@ -188,43 +188,16 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, angle_threshold
 
 def main():
 
-    # input_file_1 = files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc"
-    # input_file_2 = files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc"
+    input_file_1 = str(files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc")
+    input_file_2 = str(files('tree_comparison') / "TestTrees/Test_Morph_2_50x.swc")
         
-    # root = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\github_projects\tree_comparison\tree_comparison\TestTrees'
-    root = r'//allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/github_projects/tree_comparison/tree_comparison/TestTrees'
-
-
-    input_file_1 = os.path.join(root, '1069537949.swc')
-    input_file_2 = os.path.join(root, '1080362151.swc')
-
-    # input_file_1 = os.path.join(root, '1069537949.swc')
-    # input_file_2 = os.path.join(root, '1069537949.swc')
-
-    # input_file_1 = os.path.join(root, '1080362151.swc')
-    # input_file_2 = os.path.join(root, '1080362151.swc')
-
-    # input_file_1 = os.path.join(root, 'tree1.swc')
-    # input_file_2 = os.path.join(root, 'tree2.swc')
-
-    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x_ext.swc')
-    # input_file_2 = os.path.join(root, 'Test_Morph_4_50x_ext.swc')
-
-    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
-    # input_file_2 = os.path.join(root, 'Test_Morph_4_50x.swc')
-
-    # input_file_1 = os.path.join(root, 'Test_Morph_2_50x.swc')
-    # input_file_2 = os.path.join(root, 'Test_Morph_2_50x.swc')
-
-
     maxDepth = 2
     simFunc = "convex"
 
     distance = compare_two_trees(input_file_1, input_file_2, simFunc, maxDepth)
 
-
     print('\nSimilarity score: {}\n'.format(distance))
-    # np.testing.assert_almost_equal(distance, -0.0001)
+    np.testing.assert_almost_equal(distance, -0.0001)
     print("Code ran successfully!")
 
 

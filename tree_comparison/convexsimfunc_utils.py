@@ -24,7 +24,7 @@ def _get_segment_path(critical_nodes, new_areas, partition_length):
 
             current_pillar += this_edge_count
 
-    if len(areas_result) == 0: #TODO need to test this
+    if len(areas_result) == 0: 
         critical_nodes = np.vstack([critical_nodes, critical_nodes])
         lengths = np.array([0])
         orientations = np.array([[0, 0, 0], [0, 0, 0]])

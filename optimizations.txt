@@ -2,7 +2,7 @@
 In this code: 
 - model egdes as cylindars (using node radii)
 - hard code the valid sets
-- add downsampling (angle threshold, segment length threshold)
+- add branch downsampling (angle threshold, segment length threshold)
 - optimize the way we store path lengths?
 
 

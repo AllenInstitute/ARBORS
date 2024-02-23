@@ -1,24 +1,19 @@
 # tree comparison
 
 This package supports the quantitative comparison of tree topology. This is a beta version release that only
-contains some features, and is actively being developed. Currently, we only support a length based similarity function
-with a max depth parameter=1. We are actively developing code to support other input 
-parameters.
+contains some features, and is actively being developed. 
 
 Installation instructions
 =========================
 WIP  
 
+install Boost 
 conda create -n tree_compare_env python=3.9  
 conda activate tree_compare_env    
+pip install pybind11
 pip install git+https://github.com/AllenInstitute/tree_comparison.git
 
-NOTE:  
-The above was tested and works on Windows. If the above fails, it's suggested to create a virtual environment with python 3.9 and install lap
-from source (instead of PyPi) using the "Install from source" instructions here https://github.com/gatagat/lap.  
-Once installed, then re-try:  
-pip install git+https://github.com/AllenInstitute/tree_comparison.git
-
+ 
 
 
 Scripts
@@ -46,8 +41,7 @@ can be run in the following configurations:
 
 tree_compare_test
 ------------------------------
-test code to ensure repo is running properly. Currently only runs length similarity function
-and max_depth=1. Ensures that a self to self similarity is equal to zero.
+test code to ensure repo is running properly. Ensures that a self to self similarity is equal to zero.
 
 
 

@@ -4,7 +4,7 @@ from scipy.optimize import linear_sum_assignment
 from morph_utils.graph_traversal import bfs_tree,  dfs_tree, get_path_to_root, get_path_and_path_dist_between_two_nodes
 from tree_comparison.maxdepthtwo_utils import getValidSetCardinality, getMatchingChildren
 from convexsimfunc_utils import edges_between
-from quantized_convex_matching import quantized_convex_matching
+from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
 def compute_nDistance_matrix(raw_morphology):
     """
