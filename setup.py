@@ -26,6 +26,7 @@ setup(
             ]
         },
     include_package_data=True,
+    package_data={"tree_comparison": ["data/*"]},
     ext_modules=[extension_mod], 
     cmdclass={"build_ext": build_ext},
 )
