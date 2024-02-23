@@ -12,7 +12,7 @@ from convexsimfunc_utils import get_tree_paths, edges_between
 from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
 
-def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, angle_threshold=pi/9, partition_length=1/2000, segment_threshold=1/200):
+def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, angle_threshold=pi/9, partition_length=1/2000, segment_threshold=1/200):
     """
     Will generate a similarirty score for two input swc files.
 
@@ -122,7 +122,8 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, angle_threshold
                                                tree1_paths, 
                                                tree2_paths,
                                                maxDepth=maxDepth,
-                                               simFunc=simFunc)
+                                               simFunc=simFunc,
+                                               validSetDir=valid_set_dir)
 
 
             else:
@@ -194,7 +195,9 @@ def main():
     maxDepth = 2
     simFunc = "convex"
 
-    distance = compare_two_trees(input_file_1, input_file_2, simFunc, maxDepth)
+    valid_set_dir = str(files('tree_comparison') / "data")
+
+    distance = compare_two_trees(input_file_1, input_file_2, simFunc, maxDepth, valid_set_dir)
 
     print('\nSimilarity score: {}\n'.format(distance))
     np.testing.assert_almost_equal(distance, -0.0001)

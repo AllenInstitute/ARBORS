@@ -5,6 +5,7 @@ from math import pi
 import argschema as ags
 from tqdm import tqdm
 import itertools
+from importlib.resources import files
 from neuron_morphology.swc_io import morphology_from_swc
 from morph_utils.modifications import generate_irreducible_morph
 from morph_utils.graph_traversal import dfs_tree
@@ -33,11 +34,13 @@ class IO_Schema(ags.ArgSchema):
     similarity_function = ags.fields.String(description = "Similarity function to use. Options: 'length or convex'", default='length')
     max_depth = ags.fields.Int(description="Max depth to use for algorithm", default=1)
 
+    valid_set_dir = ags.fields.InputDir(description="Directory with valid set files", default=str(files('tree_comparison') / "data"))
+
     partition_length = ags.fields.Float(description="Partition length for downsampling tree branch", default=1/2000)
     angle_threshold = ags.fields.Float(description="Angle threshold for downsampling tree branch", default=pi/9)
     segment_threshold = ags.fields.Float(description="Segment threshold for downsampling tree branch", default=1/200)
 
-def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, partition_length, angle_threshold, segment_threshold):
+def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, partition_length, angle_threshold, segment_threshold):
     """
     Will generate a similarirty score for two input swc files.
 
@@ -45,6 +48,7 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, partition_lengt
     :param swc_file_2: str, path to swc file 2
     :param simFunc: str, either 'length' or 'convex'
     :param maxDepth: int, 1 or 2
+    :valid_set_dir: str, path to directory with valid set files
     :param angle_threshold: if angle between nodes is less than this, drop nodes here(?) currently unused. (for resampling a branch)
     :param partition_length: length between resampled nodes (for resampling a branch)
     :param segment_threshold: microns if segment is longer than this...? (for resampling a branch)
@@ -147,7 +151,8 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, partition_lengt
                                                tree1_paths, 
                                                tree2_paths,
                                                maxDepth=maxDepth,
-                                               simFunc=simFunc)
+                                               simFunc=simFunc,
+                                               validSetDir=valid_set_dir)
 
 
             else:
@@ -242,6 +247,7 @@ def main(args):
                                          swc_fn_2,
                                          simFunc=args['similarity_function'],
                                          maxDepth=args['max_depth'],
+                                         valid_set_dir=args['valid_set_dir'],
                                          partition_length=args['partition_length'],
                                          angle_threshold=args['angle_threshold'],
                                          segment_threshold=args['segment_threshold'])
@@ -265,6 +271,7 @@ def main(args):
                                       input_file_2,
                                       simFunc=args['similarity_function'],
                                       maxDepth=args['max_depth'],
+                                      valid_set_dir=args['valid_set_dir'],
                                       partition_length=args['partition_length'],
                                       angle_threshold=args['angle_threshold'],
                                       segment_threshold=args['segment_threshold'])

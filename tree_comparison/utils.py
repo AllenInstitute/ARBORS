@@ -101,7 +101,8 @@ def linearAssignment_matchingNodes(agreement,
                                    tree1_paths, 
                                    tree2_paths,
                                    maxDepth,
-                                   simFunc):
+                                   simFunc,
+                                   validSetDir):
 
     node1_children_array = np.array(node1_children)
     node2_children_array = np.array(node2_children)
@@ -145,8 +146,6 @@ def linearAssignment_matchingNodes(agreement,
             matchingChildren2 = node2_children_array[rowsol]
 
     elif maxDepth == 2:
-        # validSetDir = r'\\allen\programs\celltypes\workgroups\mousecelltypes\SarahWB\uygar_tree_comparison\matt_version\uygar_tree_comparison\treeComparison_bitbucket\saveSomeValidSetsResults_6_1_2023'
-        validSetDir = r'//allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/uygar_tree_comparison/matt_version/uygar_tree_comparison/treeComparison_bitbucket/saveSomeValidSetsResults_6_1_2023'
         minMaximalSetCardinality1, maxMaximalSetCardinality1, vs1 = getValidSetCardinality(validSetDir, tree1, node1, node1_children)
         minMaximalSetCardinality2, maxMaximalSetCardinality2, vs2 = getValidSetCardinality(validSetDir, tree2, node2, node2_children)
         matchingChildren1, matchingChildren2, sim = getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs1, 
