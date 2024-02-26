@@ -7,7 +7,7 @@ Installation instructions
 =========================
 WIP  
 
-install Boost 
+install Boost    
 conda create -n tree_compare_env python=3.9  
 conda activate tree_compare_env    
 pip install pybind11    
