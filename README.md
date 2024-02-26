@@ -10,7 +10,7 @@ WIP
 install Boost 
 conda create -n tree_compare_env python=3.9  
 conda activate tree_compare_env    
-pip install pybind11
+pip install pybind11    
 pip install git+https://github.com/AllenInstitute/tree_comparison.git
 
  
