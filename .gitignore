@@ -1,6 +1,16 @@
 .ipynb_checkpoints
 tree_comparison.egg-info
 
+/TestTrees/*
+/TestTrees
+/testing/*
+/misc
+*.swc
+*.pdf
+*.ipynb
+*.csv
+*old.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
