@@ -1,7 +1,8 @@
 import os
 import numpy as np
 import pandas as pd
-from math import pi
+import ntpath
+from math import pi, radians
 import argschema as ags
 from tqdm import tqdm
 import itertools
@@ -10,7 +11,8 @@ from neuron_morphology.swc_io import morphology_from_swc
 from morph_utils.modifications import generate_irreducible_morph
 from morph_utils.graph_traversal import dfs_tree
 from morph_utils.measurements import tree_length
-from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes
+from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes, rotate_morphology
+from tree_comparison.reporting_utils import get_edge_similarity_length, get_edge_similarity_convex
 from convexsimfunc_utils import get_tree_paths, edges_between
 from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
@@ -30,6 +32,11 @@ class IO_Schema(ags.ArgSchema):
         description="directory of swc files to make nXn comparison matrix for",
         allow_none=True
     )
+    input_ref_dir = ags.fields.InputDir(
+        default=None,
+        description="directory of swc files to use as reference cells to compare all swcs in input_swc_dir -OR- input_swc_file_1 to",
+        allow_none=True
+    )
     output_file = ags.fields.OutputFile(description="Path to output csv", default="TreeCompareOutput.csv")
     similarity_function = ags.fields.String(description = "Similarity function to use. Options: 'length or convex'", default='length')
     max_depth = ags.fields.Int(description="Max depth to use for algorithm", default=1)
@@ -40,7 +47,11 @@ class IO_Schema(ags.ArgSchema):
     angle_threshold = ags.fields.Float(description="Angle threshold for downsampling tree branch", default=pi/9)
     segment_threshold = ags.fields.Float(description="Segment threshold for downsampling tree branch", default=1/200)
 
-def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, partition_length, angle_threshold, segment_threshold):
+    number_of_rotations = max_depth = ags.fields.Int(description="Number of evenly sampled Tree2 rotations (around y axis) for comparison", default=1)
+
+# def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, partition_length, angle_threshold, segment_threshold, orientation):
+def compare_two_trees(tree1_raw, tree2_raw, simFunc, maxDepth, valid_set_dir, partition_length, angle_threshold, segment_threshold, orientation):
+
     """
     Will generate a similarirty score for two input swc files.
 
@@ -52,10 +63,15 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, 
     :param angle_threshold: if angle between nodes is less than this, drop nodes here(?) currently unused. (for resampling a branch)
     :param partition_length: length between resampled nodes (for resampling a branch)
     :param segment_threshold: microns if segment is longer than this...? (for resampling a branch)
+    :param orientation: angles (degrees) to rotate tree2 (swc_file_2) before comparison 
     :return: float, cell similarity
     """
-    tree1_raw = morphology_from_swc(swc_file_1)
-    tree2_raw = morphology_from_swc(swc_file_2)
+    # tree1_raw = morphology_from_swc(swc_file_1)
+    # tree2_raw = morphology_from_swc(swc_file_2)
+
+    #rotate tree 2 around y axis by 'orientation' degrees before comparing to tree 1
+    if not orientation == 0: 
+        tree2_raw = rotate_morphology(tree2_raw, radians(orientation))
 
     tree1_length = round(tree_length(tree1_raw), 4)
     tree2_length = round(tree_length(tree2_raw), 4)
@@ -86,6 +102,9 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, 
 
     ndDistanceMatrix1, node_id_index_dict1 = compute_nDistance_matrix(tree1_raw)
     ndDistanceMatrix2, node_id_index_dict2 = compute_nDistance_matrix(tree2_raw)
+
+    max_matching_node_1_idx=[]
+    max_matching_node_2_idx=[]
 
     agreement = {}
     agreement['agrM'] = np.zeros((len(tree1), len(tree2)))
@@ -133,26 +152,26 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, 
                 preON1 = preOrderNodes1[subtreeRootPos1: stop_index_1, :]
                 preON2 = preOrderNodes2[subtreeRootPos2: stop_index_2, :]
 
-                linearAssignment_matchingNodes(agreement,
-                                               node1,
-                                               node1_children,
-                                               node1_parent_id_matrix_idx,
-                                               ndDistanceMatrix1,
-                                               preON1,
-                                               tree1,
-                                               node_id_index_dict1,
-                                               node2,
-                                               node2_children,
-                                               node2_parent_id_matrix_idx,
-                                               ndDistanceMatrix2,
-                                               preON2,
-                                               tree2,
-                                               node_id_index_dict2,
-                                               tree1_paths, 
-                                               tree2_paths,
-                                               maxDepth=maxDepth,
-                                               simFunc=simFunc,
-                                               validSetDir=valid_set_dir)
+                agreement = linearAssignment_matchingNodes(agreement,
+                                                            node1,
+                                                            node1_children,
+                                                            node1_parent_id_matrix_idx,
+                                                            ndDistanceMatrix1,
+                                                            preON1,
+                                                            tree1,
+                                                            node_id_index_dict1,
+                                                            node2,
+                                                            node2_children,
+                                                            node2_parent_id_matrix_idx,
+                                                            ndDistanceMatrix2,
+                                                            preON2,
+                                                            tree2,
+                                                            node_id_index_dict2,
+                                                            tree1_paths, 
+                                                            tree2_paths,
+                                                            maxDepth=maxDepth,
+                                                            simFunc=simFunc,
+                                                            validSetDir=valid_set_dir)
 
 
             else:
@@ -198,29 +217,46 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, 
                                         lowerNode2 = leaf2
 
                         agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = cvxSim
-
+                    
+                    agreement['pAgrNodes'][node_1_matrix_index, node_2_matrix_index][0] = [lowerNode1['id']]
+                    agreement['pAgrNodes'][node_1_matrix_index, node_2_matrix_index][1] = [lowerNode2['id']]
+                    agreement['agrNodes'][node_1_matrix_index, node_2_matrix_index][0] = [lowerNode1['id']]
+                    agreement['agrNodes'][node_1_matrix_index, node_2_matrix_index][1] = [lowerNode2['id']]            
                     del lowerNode1
                     del lowerNode2
                     agreement['agrTypeM'][node_1_matrix_index, node_2_matrix_index] = ((node1 in leaves1) and (node2 in leaves2))
+
                 else:
                     agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = 0
+                    agreement['pAgrNodes'][node_1_matrix_index, node_2_matrix_index][0] = [node1['id']]
+                    agreement['pAgrNodes'][node_1_matrix_index, node_2_matrix_index][1] = [node2['id']]
+                    agreement['agrNodes'][node_1_matrix_index, node_2_matrix_index][0] = [node1['id']]
+                    agreement['agrNodes'][node_1_matrix_index, node_2_matrix_index][1] = [node2['id']]    
                     agreement['agrTypeM'][node_1_matrix_index, node_2_matrix_index] = False
 
             if agreement['agrM'][node_1_matrix_index, node_2_matrix_index] > maxAgreement:
                 maxAgreement = agreement['agrM'][node_1_matrix_index, node_2_matrix_index]
+                max_matching_node_1_idx = node_1_matrix_index
+                max_matching_node_2_idx = node_2_matrix_index
 
     maxAgreement = round(maxAgreement, 4)
     distance = tree1_length + tree2_length - maxAgreement
     distance = round(distance, 4)
 
-    return distance
+    matched_nodes_tree1 = agreement['agrNodes'][max_matching_node_1_idx][max_matching_node_2_idx][0]
+    matched_nodes_tree2 = agreement['agrNodes'][max_matching_node_1_idx][max_matching_node_2_idx][1] 
+
+    # return distance, max_matching_node_1_idx, max_matching_node_2_idx, agreement, node_id_index_dict1, node_id_index_dict2 
+    return distance, matched_nodes_tree1, matched_nodes_tree2
 
 
 def main(args):
 
+    #check input file paths exist 
     input_file_1 = args['input_swc_file_1']
     input_file_2 = args['input_swc_file_2']
     input_swc_dir = args['input_swc_dir']
+    input_ref_dir = args['input_ref_dir']
 
     if all([input_obj is None for input_obj in [input_file_1, input_file_2, input_swc_dir]]):
         msg = "No input swc files provided for comparison, no input directory provided. Nothing to do"
@@ -229,8 +265,162 @@ def main(args):
     if all([input_obj is not None for input_obj in [input_file_1, input_file_2, input_swc_dir]]):
         msg = "Input swc files provided and input directory provided. Either provide input swc paths OR provide directory with swc files, not both."
         raise ValueError(msg)
+    
+    #get number of rotations for tree2 (only relevant when using convex simfunc)
+    if args['similarity_function'] == 'length': num_rotations == 1 #rotation won't change sim score when using length function
+    else: num_rotations = args['number_of_rotations']
+    if num_rotations < 1: num_rotations = 1
+    orientations = [i * (360 / num_rotations) for i in range(num_rotations)]
+    # orientations = [(i * (360 / num_rotations) + 45) for i in range(num_rotations)] #TODO delete this and use line above, special case for running 4 more rotations in test dataset
 
-    if input_swc_dir is not None:
+
+    #compare to reference dir of swcs 
+    if input_ref_dir is not None:
+
+        ref_files = [os.path.join(input_ref_dir,f) for f in os.listdir(input_ref_dir) if f.endswith(".swc")]
+        if len(ref_files) < 1:
+            msg = "At least one reference swc file required in the input directory."
+            raise ValueError(msg)
+
+        # compare each swc in the input swc dir to all the reference swcs
+        if input_swc_dir is not None:
+
+            swc_files = [os.path.join(input_swc_dir,f) for f in os.listdir(input_swc_dir) if f.endswith(".swc")]
+            if len(swc_files) < 1:
+                msg = "At least one swc file required in the input directory."
+                raise ValueError(msg)
+            
+            for swc_file in swc_files:
+                tree_raw = morphology_from_swc(swc_file)
+
+                swc_filename = ntpath.basename(swc_file).rsplit('.',1)[0]
+                csv_out_path = args['output_file'].replace('.csv', '_'+swc_filename+'.csv')
+
+                results = []
+                for ref_file in ref_files:
+                    ref_tree_raw = morphology_from_swc(ref_file)
+
+                    for i, orientation in enumerate(orientations): 
+                        #TODO do the rotation here???
+
+                        this_distance, this_matched_nodes_tree1, this_matched_nodes_tree2  =  compare_two_trees(ref_tree_raw.clone(),
+                                                                                                                tree_raw.clone(), #rotate the comparison tree, not the reference tree (nice for viz later?)
+                                                                                                                simFunc=args['similarity_function'],
+                                                                                                                maxDepth=args['max_depth'],
+                                                                                                                valid_set_dir=args['valid_set_dir'],
+                                                                                                                partition_length=args['partition_length'],
+                                                                                                                angle_threshold=args['angle_threshold'],
+                                                                                                                segment_threshold=args['segment_threshold'],
+                                                                                                                orientation=orientation)
+                        if i == 0: 
+                            best_distance = this_distance
+                            best_orientation = orientation
+                            best_matched_nodes_tree1 = this_matched_nodes_tree1
+                            best_matched_nodes_tree2 = this_matched_nodes_tree2
+
+                        elif this_distance < best_distance:
+                            best_distance = this_distance
+                            best_orientation = orientation 
+                            best_matched_nodes_tree1 = this_matched_nodes_tree1
+                            best_matched_nodes_tree2 = this_matched_nodes_tree2
+
+                    #save this tree pair best results 
+                    if args['similarity_function'] == 'length':
+                        best_matched_nodes_similarity, best_matched_node_parents_tree1, best_matched_node_parents_tree2 = get_edge_similarity_length(ref_file, swc_file, best_matched_nodes_tree1, best_matched_nodes_tree2)
+                    else:
+                        best_matched_nodes_similarity, best_matched_node_parents_tree1, best_matched_node_parents_tree2 = get_edge_similarity_convex(ref_file, swc_file, best_matched_nodes_tree1, best_matched_nodes_tree2, best_orientation, args['partition_length'])
+
+                    res_dict = {
+                        "file1": ref_file,
+                        "file2": swc_file,
+                        "similarity_function": args['similarity_function'],
+                        "max_depth": args['max_depth'],
+                        "distance_score":best_distance,
+                        "orientation": best_orientation,
+                        "number_of_rotations": args['number_of_rotations'],
+                        "partition_length":args['partition_length'],
+                        "angle_threshold":args['angle_threshold'],
+                        "segment_threshold":args['segment_threshold'],
+                        "matched_nodes_tree1": best_matched_nodes_tree1,
+                        "matched_nodes_tree2": best_matched_nodes_tree2,
+                        "matched_node_parents_tree1": best_matched_node_parents_tree1,
+                        "matched_node_parents_tree2": best_matched_node_parents_tree2,
+                        "matched_node_edge_similarity": best_matched_nodes_similarity
+                    }
+                    results.append(res_dict)
+
+                #save all tree pair best results to each of the reference swcs 
+                pd.DataFrame.from_records(results).to_csv(csv_out_path, index=False)
+
+        # compare each swc in the input swc dir to all the reference swcs
+        elif input_file_1 is not None:
+            if not all([os.path.exists(p) for p in [input_file_1]]):
+                msg = "Input SWC Paths Do Not Exist. Please check the path provided: \n{} \n{}".format(input_file_1)
+                raise ValueError(msg)
+            
+            tree1_raw = morphology_from_swc(input_file_1)
+            
+            results = []
+            for ref_file in ref_files:
+                ref_tree_raw = morphology_from_swc(ref_file)
+                for i, orientation in enumerate(orientations): 
+
+                    this_distance, this_matched_nodes_tree1, this_matched_nodes_tree2  =  compare_two_trees(ref_tree_raw.clone(),
+                                                                                                            tree1_raw.clone(), #rotate the comparison tree not the reference trees noce for visualizing later I think
+                                                                                                            simFunc=args['similarity_function'],
+                                                                                                            maxDepth=args['max_depth'],
+                                                                                                            valid_set_dir=args['valid_set_dir'],
+                                                                                                            partition_length=args['partition_length'],
+                                                                                                            angle_threshold=args['angle_threshold'],
+                                                                                                            segment_threshold=args['segment_threshold'],
+                                                                                                            orientation=orientation)
+                    
+                    if i == 0: 
+                        best_distance = this_distance
+                        best_orientation = orientation
+                        best_matched_nodes_tree1 = this_matched_nodes_tree1
+                        best_matched_nodes_tree2 = this_matched_nodes_tree2
+
+                    elif this_distance < best_distance:
+                        best_distance = this_distance
+                        best_orientation = orientation 
+                        best_matched_nodes_tree1 = this_matched_nodes_tree1
+                        best_matched_nodes_tree2 = this_matched_nodes_tree2
+
+
+            #save this tree pair best results 
+            if args['similarity_function'] == 'length':
+                best_matched_nodes_similarity, best_matched_node_parents_tree1, best_matched_node_parents_tree2 = get_edge_similarity_length(ref_file, input_file_1, best_matched_nodes_tree1, best_matched_nodes_tree2)
+            else:
+                best_matched_nodes_similarity, best_matched_node_parents_tree1, best_matched_node_parents_tree2 = get_edge_similarity_convex(ref_file, input_file_1, best_matched_nodes_tree1, best_matched_nodes_tree2, best_orientation, args['partition_length'])
+
+            results = [{
+                "file1": ref_file,
+                "file2": input_file_1,
+                "similarity_function": args['similarity_function'],
+                "max_depth": args['max_depth'],
+                "distance_score":best_distance,
+                "orientation": best_orientation,
+                "number_of_rotations": args['number_of_rotations'],
+                "partition_length":args['partition_length'],
+                "angle_threshold":args['angle_threshold'],
+                "segment_threshold":args['segment_threshold'],
+                "matched_nodes_tree1": best_matched_nodes_tree1,
+                "matched_nodes_tree2": best_matched_nodes_tree2,
+                "matched_node_parents_tree1": best_matched_node_parents_tree1,
+                "matched_node_parents_tree2": best_matched_node_parents_tree2,
+                "matched_node_edge_similarity": best_matched_nodes_similarity
+            }]
+
+            pd.DataFrame.from_records(results).to_csv(args['output_file'], index=False)
+
+        else: 
+            msg = "A directory of swcs or a single swc must be given to compare the the reference dir files."
+            raise ValueError(msg)
+
+
+    #compare cells within swc_dir to each other (no reference dir)
+    elif input_swc_dir is not None:
         swc_files = [os.path.join(input_swc_dir,f) for f in os.listdir(input_swc_dir) if f.endswith(".swc")]
 
         if len(swc_files) < 2:
@@ -243,42 +433,120 @@ def main(args):
             swc_fn_1 = fn_pair[0]
             swc_fn_2 = fn_pair[1]
 
-            distance = compare_two_trees(swc_fn_1,
-                                         swc_fn_2,
-                                         simFunc=args['similarity_function'],
-                                         maxDepth=args['max_depth'],
-                                         valid_set_dir=args['valid_set_dir'],
-                                         partition_length=args['partition_length'],
-                                         angle_threshold=args['angle_threshold'],
-                                         segment_threshold=args['segment_threshold'])
+            morph_1 = morphology_from_swc(swc_fn_1)
+            morph_2 = morphology_from_swc(swc_fn_2)
+            for i, orientation in enumerate(orientations): 
+
+                this_distance, this_matched_nodes_tree1, this_matched_nodes_tree2 = compare_two_trees(morph_1.clone(),
+                                                                                                      morph_2.clone(),
+                                                                                                      simFunc=args['similarity_function'],
+                                                                                                      maxDepth=args['max_depth'],
+                                                                                                      valid_set_dir=args['valid_set_dir'],
+                                                                                                      partition_length=args['partition_length'],
+                                                                                                      angle_threshold=args['angle_threshold'],
+                                                                                                      segment_threshold=args['segment_threshold'],
+                                                                                                      orientation=orientation)
+                if i == 0: 
+                    best_distance = this_distance
+                    best_orientation = orientation
+                    best_matched_nodes_tree1 = this_matched_nodes_tree1
+                    best_matched_nodes_tree2 = this_matched_nodes_tree2
+
+                elif this_distance < best_distance:
+                    best_distance = this_distance
+                    best_orientation = orientation 
+                    best_matched_nodes_tree1 = this_matched_nodes_tree1
+                    best_matched_nodes_tree2 = this_matched_nodes_tree2
+
+            #save this tree pair best results 
+            if args['similarity_function'] == 'length':
+                best_matched_nodes_similarity, best_matched_node_parents_tree1, best_matched_node_parents_tree2 = get_edge_similarity_length(swc_fn_1, swc_fn_2, best_matched_nodes_tree1, best_matched_nodes_tree2)
+            else:
+                best_matched_nodes_similarity, best_matched_node_parents_tree1, best_matched_node_parents_tree2 = get_edge_similarity_convex(swc_fn_1, swc_fn_2, best_matched_nodes_tree1, best_matched_nodes_tree2, best_orientation, args['partition_length'])
 
             res_dict = {
                 "file1": swc_fn_1,
                 "file2": swc_fn_2,
-                "similarity": distance
+                "similarity_function": args['similarity_function'],
+                "max_depth": args['max_depth'],
+                "distance_score":best_distance,
+                "orientation": best_orientation,
+                "number_of_rotations": args['number_of_rotations'],
+                "partition_length":args['partition_length'],
+                "angle_threshold":args['angle_threshold'],
+                "segment_threshold":args['segment_threshold'],
+                "matched_nodes_tree1": best_matched_nodes_tree1,
+                "matched_nodes_tree2": best_matched_nodes_tree2,
+                "matched_node_parents_tree1": best_matched_node_parents_tree1,
+                "matched_node_parents_tree2": best_matched_node_parents_tree2,
+                "matched_node_edge_similarity": best_matched_nodes_similarity
             }
             results.append(res_dict)
 
-        pd.DataFrame.from_records(results).to_csv(args['output_file'])
+        #save all tree pair best results 
+        pd.DataFrame.from_records(results).to_csv(args['output_file'], index=False)
 
+
+    #compare file1 to file2
     else:
 
         if not all([os.path.exists(p) for p in [input_file_1, input_file_2]]):
             msg = "Input SWC Paths Do Not Exist. Please check the paths provided: \n{} \n{}".format(input_file_1, input_file_2)
             raise ValueError(msg)
+        
+        morph_1 = morphology_from_swc(input_file_1)
+        morph_2 = morphology_from_swc(input_file_2)
 
-        distance = compare_two_trees(input_file_1,
-                                      input_file_2,
-                                      simFunc=args['similarity_function'],
-                                      maxDepth=args['max_depth'],
-                                      valid_set_dir=args['valid_set_dir'],
-                                      partition_length=args['partition_length'],
-                                      angle_threshold=args['angle_threshold'],
-                                      segment_threshold=args['segment_threshold'])
+        for i, orientation in enumerate(orientations): 
 
-        results = [{"file1":input_file_1, "file2":input_file_2, "similarity":distance }]
+            this_distance, this_matched_nodes_tree1, this_matched_nodes_tree2  =  compare_two_trees(morph_1.clone(),
+                                                                                                    morph_2.clone(),
+                                                                                                    simFunc=args['similarity_function'],
+                                                                                                    maxDepth=args['max_depth'],
+                                                                                                    valid_set_dir=args['valid_set_dir'],
+                                                                                                    partition_length=args['partition_length'],
+                                                                                                    angle_threshold=args['angle_threshold'],
+                                                                                                    segment_threshold=args['segment_threshold'],
+                                                                                                    orientation=orientation)
+             
+            if i == 0: 
+                best_distance = this_distance
+                best_orientation = orientation
+                best_matched_nodes_tree1 = this_matched_nodes_tree1
+                best_matched_nodes_tree2 = this_matched_nodes_tree2
 
-        pd.DataFrame.from_records(results).to_csv(args['output_file'])
+            elif this_distance < best_distance:
+                best_distance = this_distance
+                best_orientation = orientation 
+                best_matched_nodes_tree1 = this_matched_nodes_tree1
+                best_matched_nodes_tree2 = this_matched_nodes_tree2
+
+
+        #save this tree pair best results 
+        if args['similarity_function'] == 'length':
+            best_matched_nodes_similarity, best_matched_node_parents_tree1, best_matched_node_parents_tree2 = get_edge_similarity_length(input_file_1, input_file_2, best_matched_nodes_tree1, best_matched_nodes_tree2)
+        else:
+            best_matched_nodes_similarity, best_matched_node_parents_tree1, best_matched_node_parents_tree2 = get_edge_similarity_convex(input_file_1, input_file_2, best_matched_nodes_tree1, best_matched_nodes_tree2, best_orientation, args['partition_length'])
+
+        results = [{
+            "file1": input_file_1,
+            "file2": input_file_2,
+            "similarity_function": args['similarity_function'],
+            "max_depth": args['max_depth'],
+            "distance_score":best_distance,
+            "orientation": best_orientation,
+            "number_of_rotations": args['number_of_rotations'],
+            "partition_length":args['partition_length'],
+            "angle_threshold":args['angle_threshold'],
+            "segment_threshold":args['segment_threshold'],
+            "matched_nodes_tree1": best_matched_nodes_tree1,
+            "matched_nodes_tree2": best_matched_nodes_tree2,
+            "matched_node_parents_tree1": best_matched_node_parents_tree1,
+            "matched_node_parents_tree2": best_matched_node_parents_tree2,
+            "matched_node_edge_similarity": best_matched_nodes_similarity
+        }]
+
+        pd.DataFrame.from_records(results).to_csv(args['output_file'], index=False)
 
 def console_script():
     module = ags.ArgSchemaParser(schema_type=IO_Schema)

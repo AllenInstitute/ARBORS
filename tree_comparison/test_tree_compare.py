@@ -1,18 +1,18 @@
 import os 
 import numpy as np
 from tqdm import tqdm
-from math import pi
+from math import pi, radians
 from importlib.resources import files
 from neuron_morphology.swc_io import morphology_from_swc
 from morph_utils.modifications import generate_irreducible_morph
 from morph_utils.graph_traversal import dfs_tree
 from morph_utils.measurements import tree_length
-from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes
+from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes, rotate_morphology
 from convexsimfunc_utils import get_tree_paths, edges_between
 from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
 
-def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, angle_threshold=pi/9, partition_length=1/2000, segment_threshold=1/200):
+def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, angle_threshold=pi/9, partition_length=1/2000, segment_threshold=1/200, orientation=0):
     """
     Will generate a similarirty score for two input swc files.
 
@@ -27,6 +27,10 @@ def compare_two_trees(swc_file_1, swc_file_2, simFunc, maxDepth, valid_set_dir, 
     """
     tree1_raw = morphology_from_swc(swc_file_1)
     tree2_raw = morphology_from_swc(swc_file_2)
+
+    #rotate tree 2 around y axis by 'orientation' degrees before comparing to tree 1
+    if not orientation == 0: 
+        tree2_raw = rotate_morphology(tree2_raw, radians(orientation))
 
     tree1_length = round(tree_length(tree1_raw), 4)
     tree2_length = round(tree_length(tree2_raw), 4)
@@ -194,10 +198,11 @@ def main():
         
     maxDepth = 2
     simFunc = "convex"
+    orientation = 0
 
     valid_set_dir = str(files('tree_comparison') / "data")
 
-    distance = compare_two_trees(input_file_1, input_file_2, simFunc, maxDepth, valid_set_dir)
+    distance = compare_two_trees(input_file_1, input_file_2, simFunc, maxDepth, valid_set_dir, orientation)
 
     print('\nSimilarity score: {}\n'.format(distance))
     np.testing.assert_almost_equal(distance, -0.0001)

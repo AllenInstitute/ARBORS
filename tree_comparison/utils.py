@@ -1,10 +1,33 @@
 import numpy as np
 from collections import deque
 from scipy.optimize import linear_sum_assignment
-from morph_utils.graph_traversal import bfs_tree,  dfs_tree, get_path_to_root, get_path_and_path_dist_between_two_nodes
+from neuron_morphology.transforms.affine_transform import AffineTransform, rotation_from_angle, affine_from_transform
+from morph_utils.graph_traversal import bfs_tree, dfs_tree, get_path_to_root, get_path_and_path_dist_between_two_nodes
 from tree_comparison.maxdepthtwo_utils import getValidSetCardinality, getMatchingChildren
 from convexsimfunc_utils import edges_between
+from more_itertools import flatten
 from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
+
+def rotate_morphology(morphology, angle, axis=1):
+    """
+    Rotate morphology around an axis.
+
+    :param morph: neuron_morphology Morphology object
+    :param angle: angle to rotate in Radians. clockwise direction when viewed from the positive y-axis towards the positive x-axis (right-hand rule convention)
+    :param axis: axis to rotate around (0=x, 1=y, 2=z)
+    :return: rotated neuron_morphology Morphology object 
+    """
+    rotation_affine = AffineTransform(affine_from_transform(rotation_from_angle(angle, axis)))
+    rotated_morphology = rotation_affine.transform_morphology(morphology) # if you need the original object to remain unchanged do morph.clone()
+
+    return rotated_morphology
+
+def ensure_flat_list(item):
+    if isinstance(item, list):
+        if len(item) == 1 and isinstance(item[0], list): return item[0]  # Extract the inner list
+        else: return item  # Already in the desired form
+    elif isinstance(item, int): return [item] # a single int, return as list 
+    else: return item  # Not a list or int, return as is
 
 def compute_nDistance_matrix(raw_morphology):
     """
@@ -145,6 +168,9 @@ def linearAssignment_matchingNodes(agreement,
             matchingChildren1 = node1_children
             matchingChildren2 = node2_children_array[rowsol]
 
+        matchingChildren1 = [node_id_index_dict1[c["id"]] for c in matchingChildren1]
+        matchingChildren2 = [node_id_index_dict2[c["id"]] for c in matchingChildren2]
+
     elif maxDepth == 2:
         minMaximalSetCardinality1, maxMaximalSetCardinality1, vs1 = getValidSetCardinality(validSetDir, tree1, node1, node1_children)
         minMaximalSetCardinality2, maxMaximalSetCardinality2, vs2 = getValidSetCardinality(validSetDir, tree2, node2, node2_children)
@@ -158,14 +184,14 @@ def linearAssignment_matchingNodes(agreement,
 
         for i in range(len(matchingChildren1)):
             agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] = \
-            agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] + [matchingChildren1[i], matchingChildren2[i]]
+            ensure_flat_list(agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0]) + ensure_flat_list([agreement['pAgrNodes'][matchingChildren1[i], matchingChildren2[i]][0]])
             agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] = \
-            agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] + [matchingChildren1[i], matchingChildren2[i]]
-
+            ensure_flat_list(agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1]) + ensure_flat_list([agreement['pAgrNodes'][matchingChildren1[i], matchingChildren2[i]][1]])
+        
         agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] = \
-        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] + [node1]
+        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] + [node1['id']]
         agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] = \
-        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] + [node2]
+        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] + [node2['id']]
 
     else:
         agreement['agrM'][node1_matrix_idx, node2_matrix_idx] = maxSimilarity
@@ -215,7 +241,11 @@ def linearAssignment_matchingNodes(agreement,
                             thisPlusSimilarity = simpleBound
                         if (thisPlusSimilarity > maxPlusSimilarity): 
                             maxPlusSimilarity = thisPlusSimilarity
-
+                            maxndd1_idx = node_id_index_dict1[n1]
+                            maxndd2_idx = node_id_index_dict2[n2]
                     else:
                         kk2 = kk2 + preON2[kk2, 1]
         agreement['pAgrM'][node1_matrix_idx, node2_matrix_idx] = maxPlusSimilarity
+        agreement['pAgrNodes'][node1_matrix_idx, node2_matrix_idx][0] = agreement['agrNodes'][maxndd1_idx, maxndd2_idx][0]
+        agreement['pAgrNodes'][node1_matrix_idx, node2_matrix_idx][1] = agreement['agrNodes'][maxndd1_idx, maxndd2_idx][1]    
+    return agreement

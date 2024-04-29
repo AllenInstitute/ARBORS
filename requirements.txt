@@ -8,3 +8,4 @@ argschema
 morph_utils @  git+https://github.com/MatthewMallory/morph_utils@main
 scipy
 pybind11
+more_itertools
