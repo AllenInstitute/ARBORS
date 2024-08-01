@@ -22,6 +22,7 @@ class IO_Schema(ags.ArgSchema):
     similarity_function = ags.fields.String(metadata={'description' : "Similarity function to use. Options: 'length or convex'"}, dump_default='length')
     max_depth = ags.fields.Int(metadata={'description' : "Max depth to use for algorithm"}, dump_default=1)
     number_of_rotations = ags.fields.Int(metadata={'description' : "Number of evenly sampled Tree2 rotations (around y axis) for comparison"}, dump_default=1)
+    pool_rotations = ags.fields.Bool(metadata={'description' : "Should we run all rotations in the same job?"}, dump_default=True)
 
     valid_set_dir = ags.fields.InputDir(metadata={'description' : "Directory with valid set files"}, dump_default=str(files('tree_comparison') / "data"))
     valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet_mouse_inh_viz_ctx.json'))
@@ -54,6 +55,10 @@ def main(args):
     else: num_rotations = args['number_of_rotations']
     if num_rotations < 1: num_rotations = 1
     orientations = [i * (360 / num_rotations) for i in range(num_rotations)]
+
+
+
+    ########## Step 1: get the pairs of cells to compare to eachother. ##########
 
     # OPTION 1: compare to reference dir of swcs 
     if input_ref_dir is not None:
@@ -107,9 +112,14 @@ def main(args):
         pairs = [(input_file_1, input_file_2)]
 
 
+
+    ########## Step 2: submit job files for all comparisons. ##########
+
     #compare each pair of swcs with all specified orientations. 
     job_dir = os.path.join(args['output_dir'], "JobFiles")
     os.makedirs(job_dir, exist_ok=True)
+
+    pool_rotations = args['pool_rotations'] #True == run all rotations within the same job file. False == write a job file for each comparison. 
 
     dag_id = 0 #this id is not the same as slurm id
     tree_comp_job_ids = []
@@ -117,11 +127,13 @@ def main(args):
         swc_1_path = pair[0]
         swc_2_path = pair[1]
 
-        for orientation in orientations:
+    
+        if pool_rotations:
+            
             dag_id += 1
-            job_name =  '{}_{}_rotate{}'.format(ntpath.basename(swc_1_path).rsplit('.',1)[0], ntpath.basename(swc_2_path).rsplit('.',1)[0], orientation)
+            job_name =  '{}_{}'.format(ntpath.basename(swc_1_path).rsplit('.',1)[0], ntpath.basename(swc_2_path).rsplit('.',1)[0])
 
-        #MAKE THE JOB FILE AND KICKOFF RUNNING
+            #MAKE THE JOB FILE AND KICKOFF RUNNING
             log_file = os.path.abspath(os.path.join(job_dir, "{}.out".format(job_name)))
             job_file = os.path.abspath(os.path.join(job_dir, "{}.sh".format(job_name)))
 
@@ -138,26 +150,6 @@ def main(args):
                 "--output": log_file
             }
 
-            # what you want to run on slurm
-            tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
-                                        'swc_2_path': swc_2_path,
-                                        'compartments': [AXON, BASAL_DENDRITE],
-                                        'output_dir': args['output_dir'],
-                                        'similarity_function': args['similarity_function'],
-                                        'max_depth' : args['max_depth'],
-                                        'orientation' : orientation, 
-                                        'valid_set_dir' : args['valid_set_dir'],
-                                        'valid_set_dict' : args['valid_set_dict'],
-                                        'partition_length' : args['partition_length'],
-                                        'angle_threshold' : args['angle_threshold'],
-                                        'segment_threshold' : args['segment_threshold']
-                                        }
-
-            # Filter out None values and format the arguments
-            tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
-                                        "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
-                                        for k, val in tree_comp_command_kwargs.items() if val is not None])
-
             execution_dir = os.path.abspath(".")
             cd_command = "cd {}".format(execution_dir)
                 
@@ -165,8 +157,33 @@ def main(args):
                 "source ~/.bashrc",
                 f"conda activate {args['slurm_virtual_env']}",
                 cd_command,
-                "tree-comparison {}".format(tree_comp_command_kwargs)
             ]
+
+            # what you want to run on slurm
+            for orientation in orientations:
+                tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
+                                            'swc_2_path': swc_2_path,
+                                            'compartments': [AXON, BASAL_DENDRITE],
+                                            'output_dir': args['output_dir'],
+                                            'similarity_function': args['similarity_function'],
+                                            'max_depth' : args['max_depth'],
+                                            'orientation' : orientation, 
+                                            'valid_set_dir' : args['valid_set_dir'],
+                                            'valid_set_dict' : args['valid_set_dict'],
+                                            'partition_length' : args['partition_length'],
+                                            'angle_threshold' : args['angle_threshold'],
+                                            'segment_threshold' : args['segment_threshold']
+                                            }
+
+                # Filter out None values and format the arguments
+                tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
+                                            "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
+                                            for k, val in tree_comp_command_kwargs.items() if val is not None])
+                
+
+                #add this rotation comparison 
+                #TODO this runs things serially I'm imagining... how can we paralelize?
+                slurm_commands = slurm_commands + ["tree-comparison {}".format(tree_comp_command_kwargs)]
 
             # bringing it all together
             file_gen_dag_node = {
@@ -180,6 +197,73 @@ def main(args):
 
             create_job_file(file_gen_dag_node)
             submit_job_return_id(job_file=job_file, parent_job_id=None, start_condition=None)
+
+
+
+        else: 
+            for orientation in orientations:
+                dag_id += 1
+                job_name =  '{}_{}_rotate{}'.format(ntpath.basename(swc_1_path).rsplit('.',1)[0], ntpath.basename(swc_2_path).rsplit('.',1)[0], orientation)
+
+            #MAKE THE JOB FILE AND KICKOFF RUNNING
+                log_file = os.path.abspath(os.path.join(job_dir, "{}.out".format(job_name)))
+                job_file = os.path.abspath(os.path.join(job_dir, "{}.sh".format(job_name)))
+
+                # resource request from slurm
+                slurm_resource_kwargs = {
+                    "--job-name": f"tc-{job_name}",
+                    "--mail-type": "NONE",
+                    "--nodes": "1",
+                    "--kill-on-invalid-dep": "yes",
+                    "--cpus-per-task": "2",
+                    "--mem": "10gb",
+                    "--time": "96:00:00", #"5:00:00", 
+                    "--partition": "celltypes",
+                    "--output": log_file
+                }
+
+                # what you want to run on slurm
+                tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
+                                            'swc_2_path': swc_2_path,
+                                            'compartments': [AXON, BASAL_DENDRITE],
+                                            'output_dir': args['output_dir'],
+                                            'similarity_function': args['similarity_function'],
+                                            'max_depth' : args['max_depth'],
+                                            'orientation' : orientation, 
+                                            'valid_set_dir' : args['valid_set_dir'],
+                                            'valid_set_dict' : args['valid_set_dict'],
+                                            'partition_length' : args['partition_length'],
+                                            'angle_threshold' : args['angle_threshold'],
+                                            'segment_threshold' : args['segment_threshold']
+                                            }
+
+                # Filter out None values and format the arguments
+                tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
+                                            "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
+                                            for k, val in tree_comp_command_kwargs.items() if val is not None])
+
+                execution_dir = os.path.abspath(".")
+                cd_command = "cd {}".format(execution_dir)
+                    
+                slurm_commands = [
+                    "source ~/.bashrc",
+                    f"conda activate {args['slurm_virtual_env']}",
+                    cd_command,
+                    "tree-comparison {}".format(tree_comp_command_kwargs)
+                ]
+
+                # bringing it all together
+                file_gen_dag_node = {
+                    "id": dag_id,  # this id is not the same as slurm job id.
+                    "parent_id": -1,  # this job has no upstream dependency
+                    "name": "{}-file-gen".format(job_name),
+                    "job_file": job_file,
+                    "slurm_kwargs": slurm_resource_kwargs,
+                    "slurm_commands": slurm_commands,
+                }
+
+                create_job_file(file_gen_dag_node)
+                submit_job_return_id(job_file=job_file, parent_job_id=None, start_condition=None)
 
 
 def console_script():
