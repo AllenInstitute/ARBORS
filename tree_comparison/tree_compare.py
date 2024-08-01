@@ -291,8 +291,6 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, v
 
     return distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_sim
 
-def compare_compartment(args):
-    return compare_two_trees(*args)
 
 def main(args):
 
@@ -310,18 +308,18 @@ def main(args):
 
     #paralellize compartment comparisons 
     compartments = args['compartments'] 
-    with Pool() as pool: #TODO is this actually paralellizing?
-        results = pool.map(compare_compartment, [(args['swc_1_path'], 
-                                                   args['swc_2_path'], 
-                                                   [compartment], 
-                                                   args['similarity_function'], 
-                                                   args['max_depth'], 
-                                                   args['valid_set_dict'], 
-                                                   args['partition_length'], 
-                                                   args['angle_threshold'], 
-                                                   args['segment_threshold'], 
-                                                   args['orientation'], 
-                                                   args['valid_set_dir']) for compartment in compartments])
+    with Pool() as pool: #TODO is this actually paralellizing?        
+        results = pool.starmap(compare_two_trees, [(args['swc_1_path'], 
+                                                    args['swc_2_path'], 
+                                                    [compartment], 
+                                                    args['similarity_function'], 
+                                                    args['max_depth'], 
+                                                    args['valid_set_dict'], 
+                                                    args['partition_length'], 
+                                                    args['angle_threshold'], 
+                                                    args['segment_threshold'], 
+                                                    args['orientation'], 
+                                                    args['valid_set_dir']) for compartment in compartments])
 
     #unpack results from each compartment comparison 
     for compartment, (distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_similarity_pagrm) in zip(compartments, results):
