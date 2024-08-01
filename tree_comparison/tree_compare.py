@@ -291,62 +291,6 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, v
 
     return distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_sim
 
-
-# def main(args):
-
-#     #save dict of comparison results 
-#     result = {
-#         "file1": args['swc_1_path'],
-#         "file2": args['swc_2_path'],
-#         "similarity_function": args['similarity_function'],
-#         "max_depth": args['max_depth'],
-#         "orientation": args['orientation'],
-#         "partition_length":args['partition_length'],
-#         "angle_threshold":args['angle_threshold'],
-#         "segment_threshold":args['segment_threshold']
-#     }
-
-#     #run tree comparison on each of the compartment types
-#     #this will ensure matching only happens between nodes of the same type (axon to axon, dendrite to dendrite)
-#     for compartment in args['compartments']: #TODO paralellize 
-    
-#         distance, norm_distance, matched_nodes_tree1, \
-#         matched_nodes_tree2, matched_nodes_similarity_pagrm = compare_two_trees(swc_file_1 = args['swc_1_path'],
-#                                                                                 swc_file_2 = args['swc_2_path'],
-#                                                                                 compartments = [compartment],
-#                                                                                 simFunc = args['similarity_function'],
-#                                                                                 maxDepth = args['max_depth'],
-#                                                                                 orientation = args['orientation'],
-#                                                                                 valid_set_dict = args['valid_set_dict'],
-#                                                                                 partition_length = args['partition_length'],
-#                                                                                 angle_threshold = args['angle_threshold'],
-#                                                                                 segment_threshold = args['segment_threshold'],
-#                                                                                 valid_set_dir = args['valid_set_dir'])
-    
-#         #get matched nodes of this result #TODO only do this for the best result later on? 
-#         if args['similarity_function'] == 'length':
-#             matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
-#             get_edge_similarity_length(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2)
-#         else: #convex
-#             matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
-#             get_edge_similarity_convex(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2, 
-#                                     args['orientation'], args['partition_length'])
-
-#         #save this compartment results
-#         result[f"distance_score_{compartment}"] = distance
-#         result[f"distance_score_normalized_{compartment}"] = norm_distance
-#         result[f"matched_nodes_tree1_{compartment}"] = matched_nodes_tree1
-#         result[f"matched_nodes_tree2_{compartment}"] = matched_nodes_tree2
-#         result[f"matched_node_parents_tree1_{compartment}"] = matched_node_parents_tree1
-#         result[f"matched_node_parents_tree2_{compartment}"] = matched_node_parents_tree2
-#         result[f"matched_node_edge_similarity_{compartment}"] = matched_nodes_similarity_pagrm
-        
-#     #save comparison result as json
-#     json_path = os.path.join(args['output_dir'], '{}_{}_rotate{}.json'.format(ntpath.basename(args['swc_1_path']).rsplit('.',1)[0], ntpath.basename(args['swc_2_path']).rsplit('.',1)[0], args['orientation']))
-#     with open(json_path, "w") as json_file:
-#         json.dump(result, json_file, indent=4)
-
-
 def compare_compartment(args):
     return compare_two_trees(*args)
 
