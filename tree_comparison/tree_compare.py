@@ -382,22 +382,22 @@ def main(args):
     #unpack results from each compartment comparison 
     for compartment, (distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_similarity_pagrm) in zip(compartments, results):
 
-        #get matched nodes of this result #TODO only do this for the best result later on? 
-        if args['similarity_function'] == 'length':
-            matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
-            get_edge_similarity_length(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2)
-        else: # convex
-            matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
-            get_edge_similarity_convex(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2, 
-                                    args['orientation'], args['partition_length'])
+        # #get matched nodes of this result #TODO only do this for the best result later on? 
+        # if args['similarity_function'] == 'length':
+        #     matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
+        #     get_edge_similarity_length(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2)
+        # else: # convex
+        #     matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
+        #     get_edge_similarity_convex(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2, 
+        #                             args['orientation'], args['partition_length'])
 
         #save this compartment result
         result[f"distance_score_{compartment}"] = distance
         result[f"distance_score_normalized_{compartment}"] = norm_distance
         result[f"matched_nodes_tree1_{compartment}"] = matched_nodes_tree1
         result[f"matched_nodes_tree2_{compartment}"] = matched_nodes_tree2
-        result[f"matched_node_parents_tree1_{compartment}"] = matched_node_parents_tree1
-        result[f"matched_node_parents_tree2_{compartment}"] = matched_node_parents_tree2
+        # result[f"matched_node_parents_tree1_{compartment}"] = matched_node_parents_tree1
+        # result[f"matched_node_parents_tree2_{compartment}"] = matched_node_parents_tree2
         result[f"matched_node_edge_similarity_{compartment}"] = matched_nodes_similarity_pagrm
 
 

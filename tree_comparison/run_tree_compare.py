@@ -152,8 +152,6 @@ def main(args):
                                         'angle_threshold' : args['angle_threshold'],
                                         'segment_threshold' : args['segment_threshold']
                                         }
-            # tree_comp_command_kwargs = {k: v for k, v in tree_comp_command_kwargs.items() if v is not None}
-            # tree_comp_command_kwargs = " ".join(["--{} {}".format(k, v) for k, v in tree_comp_command_kwargs.items()])
 
             # Filter out None values and format the arguments
             tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
