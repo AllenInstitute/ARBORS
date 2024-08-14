@@ -5,7 +5,7 @@ pandas
 tqdm
 numpy
 argschema
-morph_utils @  git+https://github.com/MatthewMallory/morph_utils@main
+morph_utils==1.4.6
 scipy
 pybind11
 more_itertools

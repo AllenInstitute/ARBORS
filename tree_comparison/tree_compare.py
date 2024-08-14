@@ -3,6 +3,7 @@ import json
 import ntpath
 import argschema as ags
 import numpy as np
+import shutil
 # import concurrent.futures
 from multiprocessing import Pool
 from importlib.resources import files
@@ -11,9 +12,9 @@ from tqdm import tqdm
 from neuron_morphology.swc_io import morphology_from_swc
 from neuron_morphology.constants import AXON, BASAL_DENDRITE, APICAL_DENDRITE
 from neuron_morphology.morphology import Morphology
-from morph_utils.modifications import generate_irreducible_morph
+from morph_utils.modifications import generate_irreducible_morph, resample_morphology
 from morph_utils.graph_traversal import dfs_tree, get_path_to_root
-from morph_utils.measurements import tree_length
+from morph_utils.measurements import tree_length, get_node_spacing
 from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes, rotate_morphology, remove_duplicate_nodes, flatten
 from tree_comparison.maxdepthtwo_utils import load_valid_sets
 from tree_comparison.convexsimfunc_utils import get_tree_paths, edges_between
@@ -30,8 +31,9 @@ class IO_Schema(ags.ArgSchema):
     
     similarity_function = ags.fields.String(metadata={'description' : "Similarity function to use. Options: 'length or convex'"}, dump_default='length')
     max_depth = ags.fields.Int(metadata={'description' : "Max depth to use for algorithm"}, dump_default=1)
-    orientation = ags.fields.Float(metadata={'description' : "Rotation in degrees for Tree2 (around y axis)"}, dump_default=1)
-    
+    # orientation = ags.fields.Float(metadata={'description' : "Rotation in degrees for Tree2 (around y axis)"}, dump_default=0)
+    orientations = ags.fields.List(ags.fields.Float, metadata={'description' : "List of rotations in degrees for Tree2 (around y axis)"}, dump_default=[0])
+
     valid_set_dir = ags.fields.InputDir(metadata={'description' : "Directory with valid set files"}, dump_default=str(files('tree_comparison') / "data"))
     valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet_mouseSST.json'))
    
@@ -39,9 +41,11 @@ class IO_Schema(ags.ArgSchema):
     angle_threshold = ags.fields.Float(metadata={'description' : "Angle threshold for downsampling tree branch"}, dump_default=pi/9)
     segment_threshold = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1/200)
 
+    downsample_ratio = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1)
 
-def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, valid_set_dict, 
-                      partition_length, angle_threshold, segment_threshold, orientation, valid_set_dir=None):
+
+def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, orientation, valid_set_dict, 
+                      partition_length, angle_threshold, segment_threshold, valid_set_dir=None, downsample_ratio=None):
 
     """
     Will generate a similarirty score for two input swc files.
@@ -68,6 +72,13 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, v
 
     tree1_raw = morphology_from_swc(swc_file_1)
     tree2_raw = morphology_from_swc(swc_file_2)
+
+    #downsample the neurons 
+    if downsample_ratio != 1 and downsample_ratio > 0:
+        avg_spacing_tree1, _ = get_node_spacing(tree1_raw)
+        avg_spacing_tree2, _ = get_node_spacing(tree2_raw)
+        tree1_raw = resample_morphology(tree1_raw, avg_spacing_tree1 * downsample_ratio)
+        tree2_raw = resample_morphology(tree2_raw, avg_spacing_tree2 * downsample_ratio)
 
     #only keep nodes compartment type (if a tree doesn't have nodes of this type, maxAgreement = 0 and skip comp)
     tree1_comp_leaves = tree1_raw.get_leaf_nodes(node_types=compartments)
@@ -291,39 +302,102 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, v
 
     return distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_sim
 
+# def main(args):
+
+#     #save dict of comparison results 
+#     result = {
+#         "file1": args['swc_1_path'],
+#         "file2": args['swc_2_path'],
+#         "similarity_function": args['similarity_function'],
+#         "max_depth": args['max_depth'],
+#         "orientation": args['orientation'],
+#         "partition_length": args['partition_length'],
+#         "angle_threshold": args['angle_threshold'],
+#         "segment_threshold": args['segment_threshold']
+#     }
+
+#     #paralellize compartment comparisons 
+#     compartments = args['compartments'] 
+#     with Pool() as pool: #TODO is this actually paralellizing?        
+#         results = pool.starmap(compare_two_trees, [(args['swc_1_path'], 
+#                                                     args['swc_2_path'], 
+#                                                     [compartment], 
+#                                                     args['similarity_function'], 
+#                                                     args['max_depth'], 
+#                                                     args['valid_set_dict'], 
+#                                                     args['partition_length'], 
+#                                                     args['angle_threshold'], 
+#                                                     args['segment_threshold'], 
+#                                                     args['orientation'], 
+#                                                     args['valid_set_dir']) for compartment in compartments])
+
+#     #unpack results from each compartment comparison 
+#     for compartment, (distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_similarity_pagrm) in zip(compartments, results):
+
+#         # #get matched nodes of this result #TODO only do this for the best result later on? 
+#         # if args['similarity_function'] == 'length':
+#         #     matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
+#         #     get_edge_similarity_length(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2)
+#         # else: # convex
+#         #     matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
+#         #     get_edge_similarity_convex(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2, 
+#         #                             args['orientation'], args['partition_length'])
+
+#         #save this compartment result
+#         result[f"distance_score_{compartment}"] = distance
+#         result[f"distance_score_normalized_{compartment}"] = norm_distance
+#         result[f"matched_nodes_tree1_{compartment}"] = matched_nodes_tree1
+#         result[f"matched_nodes_tree2_{compartment}"] = matched_nodes_tree2
+#         # result[f"matched_node_parents_tree1_{compartment}"] = matched_node_parents_tree1
+#         # result[f"matched_node_parents_tree2_{compartment}"] = matched_node_parents_tree2
+#         result[f"matched_node_edge_similarity_{compartment}"] = matched_nodes_similarity_pagrm
+
+
+#     #save comparison result (all compartment comparisons) as json
+#     json_path = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_rotate{args['orientation']}.json")
+#     with open(json_path, "w") as json_file:
+#         json.dump(result, json_file, indent=4)
+
 
 def main(args):
 
-    #save dict of comparison results 
-    result = {
+    # Prepare a list of parameters for each orientation and compartment comparison
+    orientations = args['orientations'] 
+    compartments = args['compartments'] 
+    tasks = [(args['swc_1_path'], 
+              args['swc_2_path'], 
+              [compartment], 
+              args['similarity_function'], 
+              args['max_depth'], 
+              orientation, 
+              args['valid_set_dict'], 
+              args['partition_length'], 
+              args['angle_threshold'], 
+              args['segment_threshold'], 
+              args['valid_set_dir'],
+              args['downsample_ratio']) 
+             for orientation in orientations 
+             for compartment in compartments]
+
+    # Run comparisons in parallel
+    with Pool() as pool:
+        results = pool.starmap(compare_two_trees, tasks)
+
+    # Save results
+    result_template = {
         "file1": args['swc_1_path'],
         "file2": args['swc_2_path'],
         "similarity_function": args['similarity_function'],
         "max_depth": args['max_depth'],
-        "orientation": args['orientation'],
         "partition_length": args['partition_length'],
         "angle_threshold": args['angle_threshold'],
-        "segment_threshold": args['segment_threshold']
-    }
+        "segment_threshold": args['segment_threshold']}
 
-    #paralellize compartment comparisons 
-    compartments = args['compartments'] 
-    with Pool() as pool: #TODO is this actually paralellizing?        
-        results = pool.starmap(compare_two_trees, [(args['swc_1_path'], 
-                                                    args['swc_2_path'], 
-                                                    [compartment], 
-                                                    args['similarity_function'], 
-                                                    args['max_depth'], 
-                                                    args['valid_set_dict'], 
-                                                    args['partition_length'], 
-                                                    args['angle_threshold'], 
-                                                    args['segment_threshold'], 
-                                                    args['orientation'], 
-                                                    args['valid_set_dir']) for compartment in compartments])
-
-    #unpack results from each compartment comparison 
-    for compartment, (distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_similarity_pagrm) in zip(compartments, results):
-
+    #dict to store summed normed_scores 
+    scores = {}
+    for rot in orientations: scores[rot] = {comp: None for comp in compartments}
+    for i, ((distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_similarity_pagrm), (compartment, orientation)) in enumerate(zip(results, [(compartment, orientation) for orientation in args['orientations'] for compartment in args['compartments']])):
+        
         # #get matched nodes of this result #TODO only do this for the best result later on? 
         # if args['similarity_function'] == 'length':
         #     matched_nodes_similarity, matched_node_parents_tree1, matched_node_parents_tree2 = \
@@ -333,21 +407,32 @@ def main(args):
         #     get_edge_similarity_convex(args['swc_1_path'], args['swc_2_path'], matched_nodes_tree1, matched_nodes_tree2, 
         #                             args['orientation'], args['partition_length'])
 
-        #save this compartment result
-        result[f"distance_score_{compartment}"] = distance
-        result[f"distance_score_normalized_{compartment}"] = norm_distance
-        result[f"matched_nodes_tree1_{compartment}"] = matched_nodes_tree1
-        result[f"matched_nodes_tree2_{compartment}"] = matched_nodes_tree2
-        # result[f"matched_node_parents_tree1_{compartment}"] = matched_node_parents_tree1
-        # result[f"matched_node_parents_tree2_{compartment}"] = matched_node_parents_tree2
-        result[f"matched_node_edge_similarity_{compartment}"] = matched_nodes_similarity_pagrm
+        #save normed score to get best overall result. 
+        scores[orientation][compartment] = norm_distance
 
+        result = result_template.copy()
+        result.update({
+            "orientation": orientation,
+            f"distance_score_{compartment}": distance,
+            f"distance_score_normalized_{compartment}": norm_distance,
+            f"matched_nodes_tree1_{compartment}": matched_nodes_tree1,
+            f"matched_nodes_tree2_{compartment}": matched_nodes_tree2,
+            # f"matched_node_parents_tree1_{compartment}": matched_node_parents_tree1,
+            # f"matched_node_parents_tree2_{compartment}": matched_node_parents_tree2,
+            f"matched_node_edge_similarity_{compartment}": matched_nodes_similarity_pagrm
+        })
+        json_path = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_rotate{orientation}_compartment{compartment}.json")
+        with open(json_path, "w") as json_file:
+            json.dump(result, json_file, indent=4)
 
-    #save comparison result (all compartment comparisons) as json
-    json_path = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_rotate{args['orientation']}.json")
-    with open(json_path, "w") as json_file:
-        json.dump(result, json_file, indent=4)
-
+    #get best rotation comparisons per compartment 
+    summed_scores = {rot: sum(scores[rot].values()) for rot in scores}
+    best_comparison_orientation = min(summed_scores, key=summed_scores.get)
+    for compartment in compartments:
+        #save the best rotation json
+        best_json_old = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_rotate{best_comparison_orientation}_compartment{compartment}.json")
+        best_json_new = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_bestRot_compartment{compartment}.json")
+        shutil.copy(best_json_old, best_json_new)
 
 def console_script():
     module = ags.ArgSchemaParser(schema_type=IO_Schema)

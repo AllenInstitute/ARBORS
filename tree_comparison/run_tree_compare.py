@@ -31,6 +31,8 @@ class IO_Schema(ags.ArgSchema):
     angle_threshold = ags.fields.Float(metadata={'description' : "Angle threshold for downsampling tree branch"}, dump_default=pi/9)
     segment_threshold = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1/200)
 
+    downsample_ratio = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1)
+
     slurm_virtual_env = ags.fields.Str(metadata={'description' : "Conda env name to run tree comparison"}, dump_default='tree_comparison_dev')
 
 
@@ -56,7 +58,7 @@ def main(args):
     if num_rotations < 1: num_rotations = 1
     orientations = [i * (360 / num_rotations) for i in range(num_rotations)]
 
-
+    compartments = [AXON, BASAL_DENDRITE]
 
     ########## Step 1: get the pairs of cells to compare to eachother. ##########
 
@@ -115,6 +117,8 @@ def main(args):
 
     ########## Step 2: submit job files for all comparisons. ##########
 
+    node_core_sizes = [32, 40, 88, 112] #HPC has nodes with these different number of nodes. Request one of these numbers of cpus. 
+
     #compare each pair of swcs with all specified orientations. 
     job_dir = os.path.join(args['output_dir'], "JobFiles")
     os.makedirs(job_dir, exist_ok=True)
@@ -129,7 +133,7 @@ def main(args):
 
     
         if pool_rotations:
-            
+
             dag_id += 1
             job_name =  '{}_{}'.format(ntpath.basename(swc_1_path).rsplit('.',1)[0], ntpath.basename(swc_2_path).rsplit('.',1)[0])
 
@@ -138,17 +142,39 @@ def main(args):
             job_file = os.path.abspath(os.path.join(job_dir, "{}.sh".format(job_name)))
 
             # resource request from slurm
+            num_cpus = next((num for num in node_core_sizes if num >= len(orientations)), max(node_core_sizes))
             slurm_resource_kwargs = {
                 "--job-name": f"tc-{job_name}",
                 "--mail-type": "NONE",
                 "--nodes": "1",
                 "--kill-on-invalid-dep": "yes",
-                "--cpus-per-task": "2",
+                "--cpus-per-task": f"{num_cpus}",
                 "--mem": "10gb",
                 "--time": "96:00:00", #"5:00:00", 
                 "--partition": "celltypes",
                 "--output": log_file
             }
+
+            # what you want to run on slurm
+            tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
+                                        'swc_2_path': swc_2_path,
+                                        'compartments': compartments,
+                                        'output_dir': args['output_dir'],
+                                        'similarity_function': args['similarity_function'],
+                                        'max_depth' : args['max_depth'],
+                                        'orientation' : orientations, 
+                                        'valid_set_dir' : args['valid_set_dir'],
+                                        'valid_set_dict' : args['valid_set_dict'],
+                                        'partition_length' : args['partition_length'],
+                                        'angle_threshold' : args['angle_threshold'],
+                                        'segment_threshold' : args['segment_threshold'],
+                                        'downsample_ratio' : args['downsample_ratio']
+                                        }
+
+            # Filter out None values and format the arguments
+            tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
+                                        "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
+                                        for k, val in tree_comp_command_kwargs.items() if val is not None])
 
             execution_dir = os.path.abspath(".")
             cd_command = "cd {}".format(execution_dir)
@@ -157,33 +183,8 @@ def main(args):
                 "source ~/.bashrc",
                 f"conda activate {args['slurm_virtual_env']}",
                 cd_command,
+                "tree-comparison {}".format(tree_comp_command_kwargs)
             ]
-
-            # what you want to run on slurm
-            for orientation in orientations:
-                tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
-                                            'swc_2_path': swc_2_path,
-                                            'compartments': [AXON, BASAL_DENDRITE],
-                                            'output_dir': args['output_dir'],
-                                            'similarity_function': args['similarity_function'],
-                                            'max_depth' : args['max_depth'],
-                                            'orientation' : orientation, 
-                                            'valid_set_dir' : args['valid_set_dir'],
-                                            'valid_set_dict' : args['valid_set_dict'],
-                                            'partition_length' : args['partition_length'],
-                                            'angle_threshold' : args['angle_threshold'],
-                                            'segment_threshold' : args['segment_threshold']
-                                            }
-
-                # Filter out None values and format the arguments
-                tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
-                                            "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
-                                            for k, val in tree_comp_command_kwargs.items() if val is not None])
-                
-
-                #add this rotation comparison 
-                #TODO this runs things serially I'm imagining... how can we paralelize?
-                slurm_commands = slurm_commands + ["tree-comparison {}".format(tree_comp_command_kwargs)]
 
             # bringing it all together
             file_gen_dag_node = {
@@ -197,7 +198,6 @@ def main(args):
 
             create_job_file(file_gen_dag_node)
             submit_job_return_id(job_file=job_file, parent_job_id=None, start_condition=None)
-
 
 
         else: 
@@ -215,9 +215,9 @@ def main(args):
                     "--mail-type": "NONE",
                     "--nodes": "1",
                     "--kill-on-invalid-dep": "yes",
-                    "--cpus-per-task": "2",
+                    "--cpus-per-task": f"{len(compartments)}",
                     "--mem": "10gb",
-                    "--time": "96:00:00", #"5:00:00", 
+                    "--time": "96:00:00", 
                     "--partition": "celltypes",
                     "--output": log_file
                 }
@@ -225,16 +225,17 @@ def main(args):
                 # what you want to run on slurm
                 tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
                                             'swc_2_path': swc_2_path,
-                                            'compartments': [AXON, BASAL_DENDRITE],
+                                            'compartments': compartments,
                                             'output_dir': args['output_dir'],
                                             'similarity_function': args['similarity_function'],
                                             'max_depth' : args['max_depth'],
-                                            'orientation' : orientation, 
+                                            'orientation' : [orientation], 
                                             'valid_set_dir' : args['valid_set_dir'],
                                             'valid_set_dict' : args['valid_set_dict'],
                                             'partition_length' : args['partition_length'],
                                             'angle_threshold' : args['angle_threshold'],
-                                            'segment_threshold' : args['segment_threshold']
+                                            'segment_threshold' : args['segment_threshold'],
+                                            'downsample_ratio' : args['downsample_ratio']
                                             }
 
                 # Filter out None values and format the arguments
