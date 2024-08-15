@@ -217,7 +217,7 @@ def main(args):
                     "--kill-on-invalid-dep": "yes",
                     "--cpus-per-task": f"{len(compartments)}",
                     "--mem": "10gb",
-                    "--time": "96:00:00", 
+                    "--time": "24:00:00", 
                     "--partition": "celltypes",
                     "--output": log_file
                 }
@@ -250,7 +250,11 @@ def main(args):
                     "source ~/.bashrc",
                     f"conda activate {args['slurm_virtual_env']}",
                     cd_command,
-                    "tree-comparison {}".format(tree_comp_command_kwargs)
+                    "start_time=$(date +%s)", 
+                    "tree-comparison {}".format(tree_comp_command_kwargs),
+                    "end_time=$(date +%s)",
+                    "elapsed_time=$(( end_time - start_time ))",
+                    'echo "Total elapsed time: $elapsed_time seconds" >> {}'.format(log_file) #save time to run this comparison to the job file. 
                 ]
 
                 # bringing it all together
