@@ -31,7 +31,7 @@ class IO_Schema(ags.ArgSchema):
     angle_threshold = ags.fields.Float(metadata={'description' : "Angle threshold for downsampling tree branch"}, dump_default=pi/9)
     segment_threshold = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1/200)
 
-    downsample_ratio = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1)
+    downsample_spacing = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=None, allow_none=True)
 
     slurm_virtual_env = ags.fields.Str(metadata={'description' : "Conda env name to run tree comparison"}, dump_default='tree_comparison_dev')
 
@@ -150,7 +150,7 @@ def main(args):
                 "--kill-on-invalid-dep": "yes",
                 "--cpus-per-task": f"{num_cpus}",
                 "--mem": "10gb",
-                "--time": "96:00:00", #"5:00:00", 
+                "--time": "96:00:00", #"96:00:00", 
                 "--partition": "celltypes",
                 "--output": log_file
             }
@@ -168,7 +168,7 @@ def main(args):
                                         'partition_length' : args['partition_length'],
                                         'angle_threshold' : args['angle_threshold'],
                                         'segment_threshold' : args['segment_threshold'],
-                                        'downsample_ratio' : args['downsample_ratio']
+                                        'downsample_spacing' : args['downsample_spacing']
                                         }
 
             # Filter out None values and format the arguments
@@ -217,7 +217,7 @@ def main(args):
                     "--kill-on-invalid-dep": "yes",
                     "--cpus-per-task": f"{len(compartments)}",
                     "--mem": "10gb",
-                    "--time": "24:00:00", 
+                    "--time": "96:00:00", 
                     "--partition": "celltypes",
                     "--output": log_file
                 }
@@ -235,7 +235,7 @@ def main(args):
                                             'partition_length' : args['partition_length'],
                                             'angle_threshold' : args['angle_threshold'],
                                             'segment_threshold' : args['segment_threshold'],
-                                            'downsample_ratio' : args['downsample_ratio']
+                                            'downsample_spacing' : args['downsample_spacing']
                                             }
 
                 # Filter out None values and format the arguments

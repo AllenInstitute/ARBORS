@@ -41,11 +41,11 @@ class IO_Schema(ags.ArgSchema):
     angle_threshold = ags.fields.Float(metadata={'description' : "Angle threshold for downsampling tree branch"}, dump_default=pi/9)
     segment_threshold = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1/200)
 
-    downsample_ratio = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1)
+    downsample_spacing = ags.fields.Float(metadata={'description' : "New node spacing for downsampling tree"}, dump_default=None, allow_none=True)
 
 
 def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, orientation, valid_set_dict, 
-                      partition_length, angle_threshold, segment_threshold, valid_set_dir=None, downsample_ratio=None):
+                      partition_length, angle_threshold, segment_threshold, valid_set_dir=None, downsample_spacing=None):
 
     """
     Will generate a similarirty score for two input swc files.
@@ -76,11 +76,9 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
     #downsample the neurons 
     num_nodes_before_tree1 = len(tree1_raw.nodes())
     num_nodes_before_tree2 = len(tree2_raw.nodes())
-    if downsample_ratio != 1 and downsample_ratio > 0:
-        avg_spacing_tree1, _ = get_node_spacing(tree1_raw)
-        avg_spacing_tree2, _ = get_node_spacing(tree2_raw)
-        tree1_raw = resample_morphology(tree1_raw, avg_spacing_tree1 * downsample_ratio)
-        tree2_raw = resample_morphology(tree2_raw, avg_spacing_tree2 * downsample_ratio)
+    if (downsample_spacing is not None) and (downsample_spacing > 0):
+        tree1_raw = resample_morphology(tree1_raw, downsample_spacing)
+        tree2_raw = resample_morphology(tree2_raw, downsample_spacing)
     num_nodes_after_tree1 = len(tree1_raw.nodes())
     num_nodes_after_tree2 = len(tree2_raw.nodes())
 
@@ -322,7 +320,7 @@ def main(args):
               args['angle_threshold'], 
               args['segment_threshold'], 
               args['valid_set_dir'],
-              args['downsample_ratio']) 
+              args['downsample_spacing']) 
              for orientation in orientations 
              for compartment in compartments]
 
