@@ -22,7 +22,7 @@ class IO_Schema(ags.ArgSchema):
     similarity_function = ags.fields.String(metadata={'description' : "Similarity function to use. Options: 'length or convex'"}, dump_default='length')
     max_depth = ags.fields.Int(metadata={'description' : "Max depth to use for algorithm"}, dump_default=1)
     number_of_rotations = ags.fields.Int(metadata={'description' : "Number of evenly sampled Tree2 rotations (around y axis) for comparison"}, dump_default=1)
-    pool_rotations = ags.fields.Bool(metadata={'description' : "Should we run all rotations in the same job?"}, dump_default=True)
+    pool_rotations = ags.fields.Bool(metadata={'description' : "Should we run all rotations in the same job?"}, dump_default=False)
 
     valid_set_dir = ags.fields.InputDir(metadata={'description' : "Directory with valid set files"}, dump_default=str(files('tree_comparison') / "data"))
     valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet_mouse_inh_viz_ctx.json'))
