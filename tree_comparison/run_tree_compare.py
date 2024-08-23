@@ -9,7 +9,7 @@ from importlib.resources import files
 # from tree_comparison.tree_compare import compare_two_trees
 from tree_comparison.slurmDAG import create_job_file, submit_job_return_id
 from neuron_morphology.constants import AXON, BASAL_DENDRITE, APICAL_DENDRITE
-
+import pickle
 
 class IO_Schema(ags.ArgSchema):
     input_swc_file_1 = ags.fields.InputFile(dump_default=None, metadata={'description' : "1st swc file to load"}, allow_none=True)
@@ -22,7 +22,7 @@ class IO_Schema(ags.ArgSchema):
     similarity_function = ags.fields.String(metadata={'description' : "Similarity function to use. Options: 'length or convex'"}, dump_default='length')
     max_depth = ags.fields.Int(metadata={'description' : "Max depth to use for algorithm"}, dump_default=1)
     number_of_rotations = ags.fields.Int(metadata={'description' : "Number of evenly sampled Tree2 rotations (around y axis) for comparison"}, dump_default=1)
-    pool_rotations = ags.fields.Bool(metadata={'description' : "Should we run all rotations in the same job?"}, dump_default=True)
+    pool_rotations = ags.fields.Bool(metadata={'description' : "Should we run all rotations in the same job?"}, dump_default=False)
 
     valid_set_dir = ags.fields.InputDir(metadata={'description' : "Directory with valid set files"}, dump_default=str(files('tree_comparison') / "data"))
     valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet_mouse_inh_viz_ctx.json'))
@@ -43,6 +43,10 @@ def main(args):
     input_file_2 = args['input_swc_file_2']
     input_swc_dir = args['input_swc_dir']
     input_ref_dir = args['input_ref_dir']
+
+    #load a set of the completed json files that we don't need to submit jobs for
+    pickle_file = '/allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/datasets/tree_comparison_sfn/mouse_viz_ctx/20240822/data/tree_comparison/completed_jsons.pkl'
+    with open(pickle_file, "rb") as file: completed_jsons = pickle.load(file)
 
     if all([input_obj is None for input_obj in [input_file_1, input_file_2, input_swc_dir]]):
         msg = "No input swc files provided for comparison, no input directory provided. Nothing to do"
@@ -202,70 +206,74 @@ def main(args):
                 dag_id += 1
                 job_name =  '{}_{}_rotate{}'.format(ntpath.basename(swc_1_path).rsplit('.',1)[0], ntpath.basename(swc_2_path).rsplit('.',1)[0], orientation)
 
-            #MAKE THE JOB FILE AND KICKOFF RUNNING
-                log_file = os.path.abspath(os.path.join(job_dir, "{}.out".format(job_name)))
-                job_file = os.path.abspath(os.path.join(job_dir, "{}.sh".format(job_name)))
+                # Only kick off this job if both compartment jsons for this rotation comparison are not complete. 
+                if not (job_name+'_compartment2.json' in completed_jsons and job_name+'_compartment3.json' in completed_jsons):
+                    #both compartmetn jsons for this rotation comparison are not complete, so kick off the job to run them. 
 
-                # resource request from slurm
-                slurm_resource_kwargs = {
-                    "--job-name": f"tc-{job_name}",
-                    "--mail-type": "NONE",
-                    "--nodes": "1",
-                    "--kill-on-invalid-dep": "yes",
-                    "--cpus-per-task": f"{len(compartments)}",
-                    "--mem": "10gb",
-                    "--time": "96:00:00", 
-                    "--partition": "celltypes",
-                    "--output": log_file
-                }
+                    #MAKE THE JOB FILE AND KICKOFF RUNNING
+                    log_file = os.path.abspath(os.path.join(job_dir, "{}.out".format(job_name)))
+                    job_file = os.path.abspath(os.path.join(job_dir, "{}.sh".format(job_name)))
 
-                # what you want to run on slurm
-                tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
-                                            'swc_2_path': swc_2_path,
-                                            'compartments': compartments,
-                                            'output_dir': args['output_dir'],
-                                            'similarity_function': args['similarity_function'],
-                                            'max_depth' : args['max_depth'],
-                                            'orientation' : [orientation], 
-                                            'valid_set_dir' : args['valid_set_dir'],
-                                            'valid_set_dict' : args['valid_set_dict'],
-                                            'partition_length' : args['partition_length'],
-                                            'angle_threshold' : args['angle_threshold'],
-                                            'segment_threshold' : args['segment_threshold'],
-                                            'downsample_spacing' : args['downsample_spacing']
-                                            }
+                    # resource request from slurm
+                    slurm_resource_kwargs = {
+                        "--job-name": f"tc-{job_name}",
+                        "--mail-type": "NONE",
+                        "--nodes": "1",
+                        "--kill-on-invalid-dep": "yes",
+                        "--cpus-per-task": f"{len(compartments)}",
+                        "--mem": "10gb",
+                        "--time": "96:00:00", 
+                        "--partition": "celltypes",
+                        "--output": log_file
+                    }
 
-                # Filter out None values and format the arguments
-                tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
-                                            "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
-                                            for k, val in tree_comp_command_kwargs.items() if val is not None])
+                    # what you want to run on slurm
+                    tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
+                                                'swc_2_path': swc_2_path,
+                                                'compartments': compartments,
+                                                'output_dir': args['output_dir'],
+                                                'similarity_function': args['similarity_function'],
+                                                'max_depth' : args['max_depth'],
+                                                'orientation' : [orientation], 
+                                                'valid_set_dir' : args['valid_set_dir'],
+                                                'valid_set_dict' : args['valid_set_dict'],
+                                                'partition_length' : args['partition_length'],
+                                                'angle_threshold' : args['angle_threshold'],
+                                                'segment_threshold' : args['segment_threshold'],
+                                                'downsample_spacing' : args['downsample_spacing']
+                                                }
 
-                execution_dir = os.path.abspath(".")
-                cd_command = "cd {}".format(execution_dir)
-                    
-                slurm_commands = [
-                    "source ~/.bashrc",
-                    f"conda activate {args['slurm_virtual_env']}",
-                    cd_command,
-                    "start_time=$(date +%s)", 
-                    "tree-comparison {}".format(tree_comp_command_kwargs),
-                    "end_time=$(date +%s)",
-                    "elapsed_time=$(( end_time - start_time ))",
-                    'echo "Total elapsed time: $elapsed_time seconds" >> {}'.format(log_file) #save time to run this comparison to the job file. 
-                ]
+                    # Filter out None values and format the arguments
+                    tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
+                                                "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
+                                                for k, val in tree_comp_command_kwargs.items() if val is not None])
 
-                # bringing it all together
-                file_gen_dag_node = {
-                    "id": dag_id,  # this id is not the same as slurm job id.
-                    "parent_id": -1,  # this job has no upstream dependency
-                    "name": "{}-file-gen".format(job_name),
-                    "job_file": job_file,
-                    "slurm_kwargs": slurm_resource_kwargs,
-                    "slurm_commands": slurm_commands,
-                }
+                    execution_dir = os.path.abspath(".")
+                    cd_command = "cd {}".format(execution_dir)
+                        
+                    slurm_commands = [
+                        "source ~/.bashrc",
+                        f"conda activate {args['slurm_virtual_env']}",
+                        cd_command,
+                        "start_time=$(date +%s)", 
+                        "tree-comparison {}".format(tree_comp_command_kwargs),
+                        "end_time=$(date +%s)",
+                        "elapsed_time=$(( end_time - start_time ))",
+                        'echo "Total elapsed time: $elapsed_time seconds" >> {}'.format(log_file) #save time to run this comparison to the job file. 
+                    ]
 
-                create_job_file(file_gen_dag_node)
-                submit_job_return_id(job_file=job_file, parent_job_id=None, start_condition=None)
+                    # bringing it all together
+                    file_gen_dag_node = {
+                        "id": dag_id,  # this id is not the same as slurm job id.
+                        "parent_id": -1,  # this job has no upstream dependency
+                        "name": "{}-file-gen".format(job_name),
+                        "job_file": job_file,
+                        "slurm_kwargs": slurm_resource_kwargs,
+                        "slurm_commands": slurm_commands,
+                    }
+
+                    create_job_file(file_gen_dag_node)
+                    submit_job_return_id(job_file=job_file, parent_job_id=None, start_condition=None)
 
 
 def console_script():
