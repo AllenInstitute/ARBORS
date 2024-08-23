@@ -117,8 +117,6 @@ def main(args):
 
     ########## Step 2: submit job files for all comparisons. ##########
 
-    node_core_sizes = [32, 40, 88, 112] #HPC has nodes with these different number of nodes. Request one of these numbers of cpus. 
-
     #compare each pair of swcs with all specified orientations. 
     job_dir = os.path.join(args['output_dir'], "JobFiles")
     os.makedirs(job_dir, exist_ok=True)
@@ -142,15 +140,14 @@ def main(args):
             job_file = os.path.abspath(os.path.join(job_dir, "{}.sh".format(job_name)))
 
             # resource request from slurm
-            num_cpus = next((num for num in node_core_sizes if num >= len(orientations)), max(node_core_sizes))
             slurm_resource_kwargs = {
                 "--job-name": f"tc-{job_name}",
                 "--mail-type": "NONE",
                 "--nodes": "1",
                 "--kill-on-invalid-dep": "yes",
-                "--cpus-per-task": f"{num_cpus}",
+                "--cpus-per-task": "32",
                 "--mem": "10gb",
-                "--time": "96:00:00", #"96:00:00", 
+                "--time": "96:00:00", 
                 "--partition": "celltypes",
                 "--output": log_file
             }
