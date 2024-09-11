@@ -8,6 +8,8 @@ import subprocess
 import concurrent.futures
 import multiprocessing
 import numexpr as ne
+import pickle
+import ntpath
 
 class IO_Schema(ags.ArgSchema):
     input_swc_file_1 = ags.fields.InputFile(dump_default=None, metadata={'description' : "1st swc file to load"}, allow_none=True)
@@ -44,6 +46,7 @@ def main(args):
 
     #set num cores/threads to be max machine has
     num_cores = multiprocessing.cpu_count() # Detect the number of available CPU cores
+    if num_cores == 32: num_cores = 8 #reduce for ashwinb-ux1 memory error. 
     os.environ['NUMEXPR_MAX_THREADS'] = str(num_cores) # Set NUMEXPR_MAX_THREADS to the number of cores
     ne.set_num_threads(num_cores) # Initialize numexpr to use this setting
     print(f"NumExpr is using {ne.detect_number_of_cores()} cores and {ne.get_num_threads()} threads.")
@@ -54,6 +57,10 @@ def main(args):
     input_file_2 = args['input_swc_file_2']
     input_swc_dir = args['input_swc_dir']
     input_ref_dir = args['input_ref_dir']
+
+    #load a set of the completed json files that we don't need to submit jobs for
+    pickle_file = '/allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/datasets/tree_comparison_sfn/mouse_viz_ctx/20240829/data/tree_comparison/completed_jsons_ashwinb-ux1.pkl'
+    with open(pickle_file, "rb") as file: completed_jsons = pickle.load(file)
 
     if all([input_obj is None for input_obj in [input_file_1, input_file_2, input_swc_dir]]):
         msg = "No input swc files provided for comparison, no input directory provided. Nothing to do"
@@ -139,29 +146,34 @@ def main(args):
         swc_1_path = pair[0]
         swc_2_path = pair[1]
 
-        # what you want to run locally
-        tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
-                                    'swc_2_path': swc_2_path,
-                                    'compartments': compartments,
-                                    'output_dir': args['output_dir'],
-                                    'similarity_function': args['similarity_function'],
-                                    'max_depth' : args['max_depth'],
-                                    'orientation' : orientations, 
-                                    'valid_set_dir' : args['valid_set_dir'],
-                                    'valid_set_dict' : args['valid_set_dict'],
-                                    'partition_length' : args['partition_length'],
-                                    'angle_threshold' : args['angle_threshold'],
-                                    'segment_threshold' : args['segment_threshold'],
-                                    'downsample_spacing' : args['downsample_spacing']
-                                    }
+        json_root = '{}_{}'.format(ntpath.basename(swc_1_path).rsplit('.',1)[0], ntpath.basename(swc_2_path).rsplit('.',1)[0])
+        json_files = {j for j in completed_jsons if j.startswith(json_root)}
+        if len(json_files) < num_rotations * len(compartments):
+            #run this comparison command --> all the rots/comps haven't completed 
 
-        # Filter out None values and format the arguments
-        tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
-                                    "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
-                                    for k, val in tree_comp_command_kwargs.items() if val is not None])
-        
-        tree_comparison_command = "tree-comparison {}".format(tree_comp_command_kwargs)
-        tree_comp_commands.append(tree_comparison_command)
+            # what you want to run locally
+            tree_comp_command_kwargs = {'swc_1_path': swc_1_path,
+                                        'swc_2_path': swc_2_path,
+                                        'compartments': compartments,
+                                        'output_dir': args['output_dir'],
+                                        'similarity_function': args['similarity_function'],
+                                        'max_depth' : args['max_depth'],
+                                        'orientation' : orientations, 
+                                        'valid_set_dir' : args['valid_set_dir'],
+                                        'valid_set_dict' : args['valid_set_dict'],
+                                        'partition_length' : args['partition_length'],
+                                        'angle_threshold' : args['angle_threshold'],
+                                        'segment_threshold' : args['segment_threshold'],
+                                        'downsample_spacing' : args['downsample_spacing']
+                                        }
+
+            # Filter out None values and format the arguments
+            tree_comp_command_kwargs = " ".join(["--{} {}".format(k, val) if not isinstance(val, list) else
+                                        "--{} ".format(k) + " ".join(["{}".format(elem) for elem in val])
+                                        for k, val in tree_comp_command_kwargs.items() if val is not None])
+            
+            tree_comparison_command = "tree-comparison {}".format(tree_comp_command_kwargs)
+            tree_comp_commands.append(tree_comparison_command)
 
     # Run commands in parallel
     print('Running commands in parallel...')

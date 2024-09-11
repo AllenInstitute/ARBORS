@@ -6,6 +6,7 @@ import itertools
 from importlib.resources import files
 from tree_comparison.slurmDAG import create_job_file, submit_job_return_id
 from neuron_morphology.constants import AXON, BASAL_DENDRITE, APICAL_DENDRITE
+import pickle 
 
 class IO_Schema(ags.ArgSchema):
     input_swc_file_1 = ags.fields.InputFile(dump_default=None, metadata={'description' : "1st swc file to load"}, allow_none=True)
@@ -39,6 +40,10 @@ def main(args):
     input_file_2 = args['input_swc_file_2']
     input_swc_dir = args['input_swc_dir']
     input_ref_dir = args['input_ref_dir']
+
+    #load a set of the completed json files that we don't need to submit jobs for
+    pickle_file = '/allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/datasets/tree_comparison_sfn/mouse_viz_ctx/20240829/data/tree_comparison/completed_jsons.pkl'
+    with open(pickle_file, "rb") as file: completed_jsons = pickle.load(file)
 
     if all([input_obj is None for input_obj in [input_file_1, input_file_2, input_swc_dir]]):
         msg = "No input swc files provided for comparison, no input directory provided. Nothing to do"
