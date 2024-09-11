@@ -156,13 +156,23 @@ def linearAssignment_matchingNodes(agreement,
         maxMatch2 = node2_children[maxChild2]
 
     if maxDepth == 1:
+        # Find the best matching between two sets of child nodes based on some measure of agreement (stored in agreement['pAgrM']). 
+        # Use a linear sum assignment algorithm to maximize the agreement between matched pairs of nodes and then returns the 
+        # corresponding matched nodes.
+
+        #extract the agreement matrix for these subtrees. 
         lap_submat = agreement['pAgrM'][np.ix_(node1_children_matrix_idx, node2_children_matrix_idx)]
+
+        #check that extracted submatrix is not 2d (i.e., one of the nodes only has one child.)
+        #if not, reshape lap_submat to be 2D, with one row and as many columns as there are node1 children.
         mat_shape = lap_submat.shape
         if len(mat_shape) != 2: lap_submat = lap_submat.reshape(1, mat_shape[0])
 
+        #find the node match that maximizes the agreement btw the subtrees
         x, rowsol = linear_sum_assignment(-lap_submat)
-        sim = lap_submat[x, rowsol].sum()
+        sim = lap_submat[x, rowsol].sum() #similarity of the best match - sum of agreement between matched nodes 
 
+        #get node matches of the optimal match 
         if len(node2_children) < len(node1_children):
             matchingChildren1 = node1_children_array[rowsol]
             matchingChildren2 = node2_children
