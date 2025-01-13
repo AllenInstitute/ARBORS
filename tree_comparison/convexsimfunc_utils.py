@@ -26,9 +26,11 @@ def _get_segment_path(critical_nodes, new_areas, partition_length, downsampling_
         orientations = np.hstack([orientations, vec_norm * np.kron(np.arange(1, this_edge_count), unit_vec.reshape(3,1)), vec.reshape(3,1)])
         areas_result = np.append(areas_result, new_areas[kk] * np.ones(this_edge_count))
         pillars = np.append(pillars, current_pillar * np.ones(this_edge_count))
+
+        current_pillar += this_edge_count
         ###################################################################################
 
-        # ###### The Original Method with partition length sections between nodes ############
+        ############ The Original Method with partition length sections between nodes ############
 
         # if this_edge_count > 0:
         #     lengths = np.append(lengths, np.ones(this_edge_count - 1) * partition_length)
@@ -39,7 +41,7 @@ def _get_segment_path(critical_nodes, new_areas, partition_length, downsampling_
 
         #     current_pillar += this_edge_count
 
-        # ####################################################################################
+        # # ######################################################################################
 
     if len(areas_result) == 0: 
         critical_nodes = np.vstack([critical_nodes, critical_nodes])

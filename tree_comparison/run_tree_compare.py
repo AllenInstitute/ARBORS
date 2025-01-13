@@ -1,15 +1,12 @@
 import os
-# import json
 import ntpath
 from math import pi
 import argschema as ags
 import itertools
 from importlib.resources import files
-# from tree_comparison.reporting_utils import get_edge_similarity_length, get_edge_similarity_convex
-# from tree_comparison.tree_compare import compare_two_trees
 from tree_comparison.slurmDAG import create_job_file, submit_job_return_id
 from neuron_morphology.constants import AXON, BASAL_DENDRITE, APICAL_DENDRITE
-
+import pickle 
 
 class IO_Schema(ags.ArgSchema):
     input_swc_file_1 = ags.fields.InputFile(dump_default=None, metadata={'description' : "1st swc file to load"}, allow_none=True)
@@ -22,7 +19,7 @@ class IO_Schema(ags.ArgSchema):
     similarity_function = ags.fields.String(metadata={'description' : "Similarity function to use. Options: 'length or convex'"}, dump_default='length')
     max_depth = ags.fields.Int(metadata={'description' : "Max depth to use for algorithm"}, dump_default=1)
     number_of_rotations = ags.fields.Int(metadata={'description' : "Number of evenly sampled Tree2 rotations (around y axis) for comparison"}, dump_default=1)
-    pool_rotations = ags.fields.Bool(metadata={'description' : "Should we run all rotations in the same job?"}, dump_default=True)
+    pool_rotations = ags.fields.Bool(metadata={'description' : "Should we run all rotations in the same job?"}, dump_default=False)
 
     valid_set_dir = ags.fields.InputDir(metadata={'description' : "Directory with valid set files"}, dump_default=str(files('tree_comparison') / "data"))
     valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet_mouse_inh_viz_ctx.json'))
@@ -44,6 +41,10 @@ def main(args):
     input_swc_dir = args['input_swc_dir']
     input_ref_dir = args['input_ref_dir']
 
+    # #load a set of the completed json files that we don't need to submit jobs for
+    # pickle_file = '/allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/datasets/tree_comparison_sfn/mouse_viz_ctx/20240829/data/tree_comparison/completed_jsons.pkl'
+    # with open(pickle_file, "rb") as file: completed_jsons = pickle.load(file)
+
     if all([input_obj is None for input_obj in [input_file_1, input_file_2, input_swc_dir]]):
         msg = "No input swc files provided for comparison, no input directory provided. Nothing to do"
         raise ValueError(msg)
@@ -53,7 +54,7 @@ def main(args):
         raise ValueError(msg)
     
     #get number of rotations for tree2 (only relevant when using convex simfunc)
-    if args['similarity_function'] == 'length': num_rotations == 1 #rotation won't change sim score when using length function
+    if args['similarity_function'] == 'length': num_rotations = 1 #rotation won't change sim score when using length function
     else: num_rotations = args['number_of_rotations']
     if num_rotations < 1: num_rotations = 1
     orientations = [i * (360 / num_rotations) for i in range(num_rotations)]
@@ -117,8 +118,6 @@ def main(args):
 
     ########## Step 2: submit job files for all comparisons. ##########
 
-    node_core_sizes = [32, 40, 88, 112] #HPC has nodes with these different number of nodes. Request one of these numbers of cpus. 
-
     #compare each pair of swcs with all specified orientations. 
     job_dir = os.path.join(args['output_dir'], "JobFiles")
     os.makedirs(job_dir, exist_ok=True)
@@ -142,15 +141,14 @@ def main(args):
             job_file = os.path.abspath(os.path.join(job_dir, "{}.sh".format(job_name)))
 
             # resource request from slurm
-            num_cpus = next((num for num in node_core_sizes if num >= len(orientations)), max(node_core_sizes))
             slurm_resource_kwargs = {
                 "--job-name": f"tc-{job_name}",
                 "--mail-type": "NONE",
                 "--nodes": "1",
                 "--kill-on-invalid-dep": "yes",
-                "--cpus-per-task": f"{num_cpus}",
+                "--cpus-per-task": "32",
                 "--mem": "10gb",
-                "--time": "96:00:00", #"96:00:00", 
+                "--time": "96:00:00", 
                 "--partition": "celltypes",
                 "--output": log_file
             }
@@ -205,7 +203,11 @@ def main(args):
                 dag_id += 1
                 job_name =  '{}_{}_rotate{}'.format(ntpath.basename(swc_1_path).rsplit('.',1)[0], ntpath.basename(swc_2_path).rsplit('.',1)[0], orientation)
 
-            #MAKE THE JOB FILE AND KICKOFF RUNNING
+                # # Only kick off this job if both compartment jsons for this rotation comparison are not complete. 
+                # if not (job_name+'_compartment2.json' in completed_jsons and job_name+'_compartment3.json' in completed_jsons):
+                #     #both compartmetn jsons for this rotation comparison are not complete, so kick off the job to run them. 
+
+                #MAKE THE JOB FILE AND KICKOFF RUNNING
                 log_file = os.path.abspath(os.path.join(job_dir, "{}.out".format(job_name)))
                 job_file = os.path.abspath(os.path.join(job_dir, "{}.sh".format(job_name)))
 
