@@ -54,7 +54,7 @@ def main(args):
         raise ValueError(msg)
     
     #get number of rotations for tree2 (only relevant when using convex simfunc)
-    if args['similarity_function'] == 'length': num_rotations == 1 #rotation won't change sim score when using length function
+    if args['similarity_function'] == 'length': num_rotations = 1 #rotation won't change sim score when using length function
     else: num_rotations = args['number_of_rotations']
     if num_rotations < 1: num_rotations = 1
     orientations = [i * (360 / num_rotations) for i in range(num_rotations)]
