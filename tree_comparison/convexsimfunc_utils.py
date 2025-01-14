@@ -3,15 +3,27 @@ import pandas as pd
 from morph_utils.graph_traversal import get_path_to_root
 
 def _get_segment_path(critical_nodes, new_areas, partition_length, downsampling_factor):
+    """
+    Calculate the segment path for critical nodes based on the partition length and downsampling factor.
+
+    Parameters:
+      critical_nodes (np.ndarray): Array of critical node positions.
+      new_areas (np.ndarray): Array of areas corresponding to the critical nodes.
+      partition_length (float): The length used to partition the segments.
+      downsampling_factor (float): Factor used for downsampling (not used in current implementation).
+
+    Returns:
+      tuple: A tuple containing:
+        - lengths (np.ndarray): Array of segment lengths.
+        - orientations (np.ndarray): Array of orientations for each segment.
+        - areas_result (np.ndarray): Array of areas corresponding to each segment.
+        - pillars (np.ndarray): Array indicating the pillar number for each segment.
+    """
     orientations = np.array([[0], [0], [0]])
     lengths = np.array([])
     areas_result = np.array([])
     pillars = np.array([0])
     current_pillar = 0
-
-    # for kk in range(0, critical_nodes.shape[0] - 1, downsampling_factor):
-    #     print('kk: {}'.format(kk))
-        # vec = critical_nodes[min(kk + downsampling_factor, critical_nodes.shape[0] - 1), :] - critical_nodes[kk, :]
 
     for kk in range(critical_nodes.shape[0] - 1):
         vec = critical_nodes[kk + 1, :] - critical_nodes[kk, :]
@@ -53,7 +65,25 @@ def _get_segment_path(critical_nodes, new_areas, partition_length, downsampling_
     return lengths, orientations, areas_result, pillars
 
 def get_tree_paths(raw_morphology, partition_length, downsampling_factor=1):
+    """
+    Calculate the paths from each irreducible node to its irreducible parent in the tree, 
+    including segment lengths, orientations, and areas.
 
+    Parameters:
+      raw_morphology (Morphology): A morphology object containing the tree structure.
+      partition_length (float): The length used to partition the segments.
+      downsampling_factor (float, optional): Factor used for downsampling.
+
+    Returns:
+      dict: A dictionary where the key is the node ID and the value is a dictionary containing:
+        - critical_nodes (np.ndarray): X,Y,Z positions of nodes along the path.
+        - lengths (np.ndarray): Lengths between all contiguous critical nodes.
+        - total_length (float): Length of the full path between two irreducible nodes.
+        - orientations (np.ndarray): Orientations of all segments between contiguous critical nodes.
+        - areas (np.ndarray): Areas of all segments between contiguous critical nodes. Currently set to 1, but could model paths as cylinders using node radii in the future. 
+        - pillars (np.ndarray): Array indicating the pillar number for each segment.
+    
+    """
     irreducible_nodes = [n for n in raw_morphology.nodes() if
                             (len(raw_morphology.get_children(n)) > 1) or (len(raw_morphology.get_children(n)) == 0) or (
                                         n['parent'] == -1)]
@@ -78,27 +108,13 @@ def get_tree_paths(raw_morphology, partition_length, downsampling_factor=1):
                 raw_path_to_irreducible_parent.append(ancestor)
                 if ancestor in irreducible_nodes: break 
 
-            # #TODO downsample 
-            # print('len(raw_path_to_irreducible_parent): {}'.format(len(raw_path_to_irreducible_parent)))
-            # print('raw_path_to_irreducible_parent: {}'.format(raw_path_to_irreducible_parent))
-
-            # downsample_thresh = 10
-            # downsampling_factor = 2
-            # if len(raw_path_to_irreducible_parent) > downsample_thresh:
-            #     raw_path_to_irreducible_parent = raw_path_to_irreducible_parent[::downsampling_factor]
-            #     print('DOWNSAMPLE')
-            #     print('len(raw_path_to_irreducible_parent): {}'.format(len(raw_path_to_irreducible_parent)))
-            #     print('raw_path_to_irreducible_parent: {}'.format(raw_path_to_irreducible_parent))
-
             #get length and orientation info for this path to irreduicble parent 
             num_edges = len(raw_path_to_irreducible_parent)-1
             path_area = np.ones(num_edges) #TODO add option to model edges as cylindars using node radii 
 
             critical_nodes = pd.DataFrame(raw_path_to_irreducible_parent)[['x', 'y', 'z']].to_numpy()
-            # print('len(critical_nodes): {}'.format(len(critical_nodes)))
             
             lengths, orientations, areas, pillars = _get_segment_path(critical_nodes, path_area, partition_length, downsampling_factor)
-
 
             tree_path_node = {}
             tree_path_node['critical_nodes'] = critical_nodes
@@ -113,17 +129,30 @@ def get_tree_paths(raw_morphology, partition_length, downsampling_factor=1):
     return tree_paths
 
 def edges_between(descendent, ancestor, tree, tree_paths):
-    """ 
-    Direct translation of edges_between.m 
+    """
+    Accumulates the edges between a descendent and ancestor in a tree.
 
-    Accumulates the edges between a descendent and ancestor in a tree. 
+    Parameters:
+      descendent (dict): The node from which the path starts.
+      ancestor (dict): The node where the path ends.
+      tree (Morphology): The full tree Morphology object.
+      tree_paths (dict): A dictionary where each key is a node ID and the value is another dictionary containing:
 
-        # tree{node}{4}{1} = critical_nodes 
-        # tree{node}{4}{2} = lengths
-        # tree{node}{4}{3} = orientations
-        # tree{node}{4}{4} = areas
-        # tree{node}{4}{5} = pillars
+    Returns:
+      tuple: A tuple containing:
+        - list: A list of edge lengths.
+        - list: A flattened list of edge orientations (x, y, z coordinates).
+        - list: A list of edge areas.
+        - list: A list of pillar numbers.
 
+    Notes: 
+    - Direct translation of edges_between.m 
+        - tree{node}{4}{1} = critical_nodes 
+        - tree{node}{4}{2} = lengths
+        - tree{node}{4}{3} = orientations
+        - tree{node}{4}{4} = areas
+        - tree{node}{4}{5} = pillars
+    
     """
     edge_lengths = np.array([])
     edge_orientations_x = np.array([])

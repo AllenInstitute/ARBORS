@@ -3,8 +3,6 @@ import json
 import ntpath
 import argschema as ags
 import numpy as np
-import shutil
-# import concurrent.futures
 from multiprocessing import Pool
 from importlib.resources import files
 from math import pi, radians 
@@ -14,28 +12,26 @@ from neuron_morphology.constants import AXON, BASAL_DENDRITE, APICAL_DENDRITE
 from neuron_morphology.morphology import Morphology
 from morph_utils.modifications import generate_irreducible_morph, resample_morphology
 from morph_utils.graph_traversal import dfs_tree, get_path_to_root
-from morph_utils.measurements import tree_length, get_node_spacing
+from morph_utils.measurements import tree_length
 from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes, rotate_morphology, remove_duplicate_nodes, flatten
 from tree_comparison.maxdepthtwo_utils import load_valid_sets
 from tree_comparison.convexsimfunc_utils import get_tree_paths, edges_between
 from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
-from tree_comparison.reporting_utils import get_edge_similarity_length, get_edge_similarity_convex
 
 class IO_Schema(ags.ArgSchema):
-    swc_1_path = ags.fields.InputFile(dump_default=None, metadata={'description' : "path to tree1 swc"}, allow_none=True)
-    swc_2_path = ags.fields.InputFile(dump_default=None, metadata={'description' : "path to tree2 swc"}, allow_none=True)
+    swc_1_path = ags.fields.InputFile(dump_default=None, metadata={'description' : "path to tree1 swc"})
+    swc_2_path = ags.fields.InputFile(dump_default=None, metadata={'description' : "path to tree2 swc"})
 
     compartments = ags.fields.List(ags.fields.Int, cli_as_single_argument=False, dump_default=[AXON, BASAL_DENDRITE, APICAL_DENDRITE], metadata={'description' : "compartment types to compare."})
 
-    output_dir = ags.fields.OutputDir(metadata={'description' : "dir to output jsons"}, dump_default=None, allow_none=True)
+    output_dir = ags.fields.OutputDir(metadata={'description' : "dir to output jsons"})
     
     similarity_function = ags.fields.String(metadata={'description' : "Similarity function to use. Options: 'length or convex'"}, dump_default='length')
     max_depth = ags.fields.Int(metadata={'description' : "Max depth to use for algorithm"}, dump_default=1)
-    # orientation = ags.fields.Float(metadata={'description' : "Rotation in degrees for Tree2 (around y axis)"}, dump_default=0)
     orientations = ags.fields.List(ags.fields.Float, metadata={'description' : "List of rotations in degrees for Tree2 (around y axis)"}, dump_default=[0])
 
     valid_set_dir = ags.fields.InputDir(metadata={'description' : "Directory with valid set files"}, dump_default=str(files('tree_comparison') / "data"))
-    valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet_mouse_inh_viz_ctx.json'))
+    valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet.json'))
    
     partition_length = ags.fields.Float(metadata={'description' : "Partition length for downsampling tree branch"}, dump_default=1/2000)
     angle_threshold = ags.fields.Float(metadata={'description' : "Angle threshold for downsampling tree branch"}, dump_default=pi/9)
@@ -48,18 +44,32 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                       partition_length, angle_threshold, segment_threshold, valid_set_dir=None, downsample_spacing=None):
 
     """
-    Will generate a similarirty score for two input swc files.
+    Generate a similarity score for two input SWC files.
 
-    :param swc_file_1: str, path to swc file 1
-    :param swc_file_2: str, path to swc file 2
-    :param simFunc: str, either 'length' or 'convex'
-    :param maxDepth: int, 1 or 2
-    :valid_set_dir: str, path to directory with valid set files
-    :param angle_threshold: if angle between nodes is less than this, drop nodes here(?) currently unused. (for resampling a branch)
-    :param partition_length: length between resampled nodes (for resampling a branch)
-    :param segment_threshold: microns if segment is longer than this...? (for resampling a branch)
-    :param orientation: angles (degrees) to rotate tree2 (swc_file_2) before comparison 
-    :return: float, cell similarity
+    Parameters:
+        swc_file_1 (str): Path to the first SWC file.
+        swc_file_2 (str): Path to the second SWC file.
+        compartments (list[int]): Compartment node types to keep for comparison.
+        simFunc (str): Similarity function, either 'length' or 'convex'.
+        maxDepth (int): Depth for comparison, either 1 or 2.
+        orientation (float): Angle (in degrees) to rotate the second tree (swc_file_2) around the y-axis for comparison.
+        valid_set_dict (dict): Hardcoded valid sets for when maxDepth == 2.
+        partition_length (float): Length between resampled nodes (used for resampling a branch).
+        angle_threshold (float): Angle threshold between nodes for resampling a branch (currently unused).
+        segment_threshold (float): Threshold for resampling a branch (currently unused).
+        valid_set_dir (str): Path to the directory containing valid set files.
+        downsample_spacing (float): Distance between nodes for tree resampling.
+
+    Returns:
+        float: Cell similarity score.
+        float: Normalized cell similarity score.
+        list[tuple]: Matched nodes from the first tree (tree1).
+        list[tuple]: Matched nodes from the second tree (tree2).
+        int: Number of nodes in the first tree before processing.
+        int: Number of nodes in the second tree before processing.
+        int: Number of nodes in the first tree after processing.
+        int: Number of nodes in the second tree after processing.
+        #TODO list[float]: Matched node similarity scores.
     """
     #load hardcoded valid set dict if given for max depth = 2
     if (maxDepth == 2) and (valid_set_dict is not None): 
@@ -120,9 +130,9 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         preOrderNodes2 = preOrderTraversal(tree2, root2)
 
         partition_length_tree1 = partition_length*tree1_length 
-        segment_threshold_tree1 = segment_threshold*tree1_length
+        # segment_threshold_tree1 = segment_threshold*tree1_length
         partition_length_tree2 = partition_length*tree2_length 
-        segment_threshold_tree2 = segment_threshold*tree2_length
+        # segment_threshold_tree2 = segment_threshold*tree2_length
 
         tree1_paths = get_tree_paths(tree1_raw, partition_length_tree1)
         tree2_paths = get_tree_paths(tree2_raw, partition_length_tree2)
@@ -147,7 +157,6 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
 
         maxAgreement = 0
         for i_1 in tqdm(range(len(tree1.nodes()))):
-        # for i_1 in range(len(tree1.nodes())): #Uncomment to allow print statements - diagnostic. TODO remove when commit 
             node1 = postOrderNodes1[i_1]
             node1_children = tree1.get_children(node1)
             node_1_matrix_index = node_id_index_dict1[node1['id']]
@@ -284,7 +293,8 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         matched_nodes_tree2 = agreement['agrNodes'][max_matching_node_1_idx][max_matching_node_2_idx][1] 
 
         #save the plus agreement sim score btw all matched nodes... I think there's a reason why this is NOT correct, need to remember why that is. 
-        matched_nodes_sim = [agreement['pAgrM'][node_id_index_dict1[matched_nodes_tree1[i]], node_id_index_dict2[matched_nodes_tree2[i]]] for i in range(len(matched_nodes_tree1))]
+        # matched_nodes_sim = [agreement['pAgrM'][node_id_index_dict1[matched_nodes_tree1[i]], node_id_index_dict2[matched_nodes_tree2[i]]] for i in range(len(matched_nodes_tree1))]
+        # matched_nodes_sim = [] #TODO add this output
 
         #calculate the distance score 
         distance = tree1_length + tree2_length - maxAgreement
@@ -298,11 +308,11 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         maxAgreement = 0
         matched_nodes_tree1 = []
         matched_nodes_tree2 = []
-        matched_nodes_sim = []
+        # matched_nodes_sim = []
         distance = -3
         norm_distance = -3
 
-    return distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_sim, num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2
+    return distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2 #matched_nodes_sim
 
 def main(args):
 
@@ -338,13 +348,11 @@ def main(args):
         "angle_threshold": args['angle_threshold'],
         "segment_threshold": args['segment_threshold']}
 
-    #dict to store summed normed_scores 
-    scores = {}
-    for rot in orientations: scores[rot] = {comp: None for comp in compartments}
-    for i, ((distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_similarity_pagrm, num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2), (compartment, orientation)) in enumerate(zip(results, [(compartment, orientation) for orientation in args['orientations'] for compartment in args['compartments']])):
-        
-        #save normed score to get best overall result. 
-        scores[orientation][compartment] = norm_distance
+    # Save each orientation/compartment result csv
+    #TODO find the best rotation comparison here
+    for i, ((distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_similarity_pagrm, \
+             num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2), \
+             (compartment, orientation)) in enumerate(zip(results, [(compartment, orientation) for orientation in args['orientations'] for compartment in args['compartments']])):
 
         result = result_template.copy()
         result.update({
@@ -353,7 +361,7 @@ def main(args):
             f"distance_score_normalized_{compartment}": norm_distance,
             f"matched_nodes_tree1_{compartment}": matched_nodes_tree1,
             f"matched_nodes_tree2_{compartment}": matched_nodes_tree2,
-            f"matched_node_edge_similarity_{compartment}": matched_nodes_similarity_pagrm,
+            # f"matched_node_edge_similarity_{compartment}": matched_nodes_similarity_pagrm,
             f"num_nodes_before_tree1": num_nodes_before_tree1,
             f"num_nodes_before_tree2": num_nodes_before_tree2, 
             f"num_nodes_after_tree1": num_nodes_after_tree1,
@@ -362,16 +370,6 @@ def main(args):
         json_path = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_rotate{orientation}_compartment{compartment}.json")
         with open(json_path, "w") as json_file:
             json.dump(result, json_file, indent=4)
-
-    # #get best rotation comparisons per compartment 
-    # #TODO this should only happen if we are running multiple orientations
-    # summed_scores = {rot: sum(scores[rot].values()) for rot in scores}
-    # best_comparison_orientation = min(summed_scores, key=summed_scores.get)
-    # for compartment in compartments:
-    #     #save the best rotation json
-    #     best_json_old = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_rotate{best_comparison_orientation}_compartment{compartment}.json")
-    #     best_json_new = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_bestRot_compartment{compartment}.json")
-    #     shutil.copy(best_json_old, best_json_new)
 
 def console_script():
     module = ags.ArgSchemaParser(schema_type=IO_Schema)
