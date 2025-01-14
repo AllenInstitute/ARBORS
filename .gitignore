@@ -7,6 +7,8 @@ TestTrees
 TestTrees/*
 testing/
 /misc
+forest/
+archive/
 # *.swc
 *.pdf
 *.ipynb
