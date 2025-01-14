@@ -14,7 +14,7 @@ with open("requirements.txt", "r") as f:
 
 setup(
     name='tree_comparison',
-    version='0.1.0',    
+    version='0.2.0',    
     author='Sarah Walling-Bell',
     author_email='sarah.wallingbell@alleninstitute.org',
     description='Python package for quantification of tree similarity',
