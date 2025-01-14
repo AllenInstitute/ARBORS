@@ -9,6 +9,7 @@ testing/
 /misc
 forest/
 archive/
+todo/
 # *.swc
 *.pdf
 *.ipynb
@@ -16,7 +17,6 @@ archive/
 *old.py
 *.json
 core.*
-*/reporting_utils.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
