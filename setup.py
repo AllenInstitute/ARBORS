@@ -4,8 +4,7 @@ from pybind11.setup_helpers import Pybind11Extension, build_ext
 extension_mod = Pybind11Extension(
     "tree_comparison.cpp.quantized_convex_matching",
     ['tree_comparison/cpp/quantizedConvexMatching.cpp'],
-    # extra_compile_args=['-I/usr/include/boost'],
-    extra_compile_args=['-I//allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/boost'],
+    extra_compile_args=['-I/usr/include/boost'],
     language='c++'
 )
 
@@ -14,7 +13,7 @@ with open("requirements.txt", "r") as f:
 
 setup(
     name='tree_comparison',
-    version='0.1.0',    
+    version='0.2.0',    
     author='Sarah Walling-Bell',
     author_email='sarah.wallingbell@alleninstitute.org',
     description='Python package for quantification of tree similarity',

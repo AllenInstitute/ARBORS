@@ -7,6 +7,8 @@ from neuron_morphology.constants import AXON, BASAL_DENDRITE
 
 class TestTreeCompare(unittest.TestCase):
 
+    #TODO add test that a tree compared to itself has distance == 0
+
     def setUp(self):
         self.tree1 = os.path.join(os.path.dirname(__file__), 'test_data', '601506507.swc')
         self.tree2 = os.path.join(os.path.dirname(__file__), 'test_data', '898703349.swc')
