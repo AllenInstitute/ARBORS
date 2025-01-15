@@ -45,14 +45,14 @@ This package uses a similarity function to find optimal node matching between tw
 # Example Usage
 Compare the basal dendrites of two swc files using the convex similarity function and max depth 2 at four rotations.
 ```bash 
-tree_compare  
---swc_1_path path/to/file1.swc  
---swc_2_path path/to/file2.swc  
+tree-compare 
+--swc_1_path path/to/file1.swc 
+--swc_2_path path/to/file2.swc 
 --output_dir path/to/save/results 
---similarity_function convex  
---max_depth 2
---compartments [3]
---orientations [0, 90, 180, 270]
+--similarity_function convex 
+--max_depth 2 
+--compartments 3 
+--orientations 0 90 180 270 
 --valid_set_dict path/to/valid_set.json
 ```
 
