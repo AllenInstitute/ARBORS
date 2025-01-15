@@ -7,16 +7,16 @@ Install Boost: https://www.boost.org/
 
 Setup a conda environment with the proper requirements and clone the repo
 ```bash
-    conda create -n tree_compare_env python=3.9  
-    conda activate tree_compare_env    
-    pip install pybind11    
-    pip install git+https://github.com/AllenInstitute/tree_comparison.git
+conda create -n tree_compare_env python=3.9  
+conda activate tree_compare_env    
+pip install pybind11    
+pip install git+https://github.com/AllenInstitute/tree_comparison.git
 ```
 
 Pip install tree comparison 
 ```bash
-    cd tree_comparison
-    pip install . 
+cd tree_comparison
+pip install . 
 ```
 
 ## Scripts
@@ -30,12 +30,12 @@ Script to take two swc files and compute the tree similarity.
 This package uses a similarity function to find optimal node matching between two trees, and calculate the resulting similarity. 
 
 **similarity_function**: which similarity function to use in tree node matching. 
-- length: compare the length of the matched edges.  
-- convex: compare the length and orientation of the matched edges. 
+- **length**: compare the length of the matched edges.  
+- **convex**: compare the length <u>and orientation</u> of the matched edges. Takes tree topology into account.
     
 **max_depth**: what depth of subtrees to match nodes between. 
-- 1: match subtrees to the child depth. 
-- 2: match subtrees to the grandchild depth. 
+- **1**: match subtrees to the child depth. 
+- **2**: match subtrees to the grandchild depth. Robust to slight variance in branch labelling. 
 
 **compartments**: which compartments of the tree to compare within.
 
@@ -46,15 +46,15 @@ This package uses a similarity function to find optimal node matching between tw
 ## Example Usage
 Compare the basal dendrites of two swc files using the convex similarity function and max depth 2 at four rotations.
 ```bash 
-    tree_compare  
-    --swc_1_path path/to/file1.swc  
-    --swc_2_path path/to/file2.swc  
-    --output_dir path/to/save/results 
-    --similarity_function convex  
-    --max_depth 2
-    --compartments [3]
-    --orientations [0, 90, 180, 270]
-    --valid_set_dict path/to/valid_set.json
+tree_compare  
+--swc_1_path path/to/file1.swc  
+--swc_2_path path/to/file2.swc  
+--output_dir path/to/save/results 
+--similarity_function convex  
+--max_depth 2
+--compartments [3]
+--orientations [0, 90, 180, 270]
+--valid_set_dict path/to/valid_set.json
 ```
 
 ## Statement of Support
