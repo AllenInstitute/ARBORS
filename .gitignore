@@ -17,6 +17,7 @@ todo/
 *old.py
 *.json
 core.*
+*.mat
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
