@@ -4,8 +4,7 @@ from pybind11.setup_helpers import Pybind11Extension, build_ext
 extension_mod = Pybind11Extension(
     "tree_comparison.cpp.quantized_convex_matching",
     ['tree_comparison/cpp/quantizedConvexMatching.cpp'],
-    # extra_compile_args=['-I/usr/include/boost'],
-    extra_compile_args=['-I//allen/programs/celltypes/workgroups/mousecelltypes/SarahWB/boost'],
+    extra_compile_args=['-I/usr/include/boost'],
     language='c++'
 )
 
