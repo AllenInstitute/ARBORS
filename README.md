@@ -40,7 +40,7 @@ This package uses a similarity function to find optimal node matching between tw
 
 **similarity_function**: which similarity function to use in tree node matching. 
 - **length**: compare the length of the matched edges.  
-- **convex**: compare the length ~and orientation~ of the matched edges. Takes tree topology into account.
+- **convex**: compare the length *and orientation* of the matched edges. Takes tree topology into account.
     
 **max_depth**: what depth of subtrees to match nodes between. 
 - **1**: match subtrees to the child depth. 
