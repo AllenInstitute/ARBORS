@@ -350,7 +350,7 @@ def main(args):
 
     # Save each orientation/compartment result csv
     #TODO find the best rotation comparison here
-    for i, ((distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, matched_nodes_similarity_pagrm, \
+    for i, ((distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, \
              num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2), \
              (compartment, orientation)) in enumerate(zip(results, [(compartment, orientation) for orientation in args['orientations'] for compartment in args['compartments']])):
 
