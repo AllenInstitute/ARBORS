@@ -10,14 +10,24 @@ Setup a conda environment with the proper requirements and clone the repo
 conda create -n tree_compare_env python=3.9  
 conda activate tree_compare_env    
 pip install pybind11    
-pip install git+https://github.com/AllenInstitute/tree_comparison.git
+# git clone git@github.com:AllenInstitute/tree_comparison.git
+git clone git@github.com:sarahwallingbell/tree_comparison.git
+```
+
+Ensure correct path to Boost in setup.py
+```bash
+extra_compile_args=['-I/path/to/boost/install']
 ```
 
 Pip install tree comparison 
 ```bash
 cd tree_comparison
+python setup.py build_ext --inplace
 pip install . 
 ```
+
+NOTE:
+The above was tested and works on Linux.
 
 # Scripts
 After installation the following console script will be available to run from the command line of your environment. To see detailed instructions on each script type the name of the SCRIPT_NAME --help
