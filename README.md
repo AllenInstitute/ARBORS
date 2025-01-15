@@ -22,8 +22,7 @@ pip install .
 ## Scripts
 After installation the following console script will be available to run from the command line of your environment. To see detailed instructions on each script type the name of the SCRIPT_NAME --help
 
-tree_compare
-----------------------------
+#### tree_compare
 Script to take two swc files and compute the tree similarity. 
 
 ## Explanation of some keyword arguments
