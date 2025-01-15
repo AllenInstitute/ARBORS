@@ -5,7 +5,6 @@ from neuron_morphology.transforms.affine_transform import AffineTransform, rotat
 from morph_utils.graph_traversal import bfs_tree, dfs_tree, get_path_to_root, get_path_and_path_dist_between_two_nodes
 from tree_comparison.maxdepthtwo_utils import getValidSetCardinality_hardcode, getMatchingChildren_hardcode, getValidSetCardinality, getMatchingChildren
 from tree_comparison.convexsimfunc_utils import edges_between
-# from more_itertools import flatten
 from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
 def rotate_morphology(morphology, angle, axis=1):
