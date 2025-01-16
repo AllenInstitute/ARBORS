@@ -7,6 +7,9 @@ TestTrees
 TestTrees/*
 testing/
 /misc
+forest/
+archive/
+todo/
 # *.swc
 *.pdf
 *.ipynb
@@ -14,6 +17,7 @@ testing/
 *old.py
 *.json
 core.*
+*.mat
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

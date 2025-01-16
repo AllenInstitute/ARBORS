@@ -9,15 +9,18 @@ from importlib.resources import files
 import copy
 
 def postOrderTraversalWithOptions(node,tree,currentDepth,maxDepth):
-    #get all descendents of this node in the tree from currentDepth down to maxDepth 
-    """ 
-    Get all descnedents of a node from the current depth down to the max depth. 
+    """
+    Get all descendants of a node from the current depth down to the max depth.
 
-    :param nodeNumber: node to find descendents from 
-    :param tree: tree with nodes to search 
-    :param currentDepth: starting depth
-    :param maxDepth: ending depth
-    :return: list of descendent nodes including input node (returns the node id)
+    Parameters:
+        nodeNumber (int): The node ID from which to find descendants.
+        tree (Morphology): The Morphology object containing the nodes to search.
+        currentDepth (int): The starting depth to begin the search.
+        maxDepth (int): The maximum depth at which to stop searching.
+
+    Returns:
+        list: A list of descendant node IDs, including the input node.
+
     """
     nodeList = []
     if currentDepth < maxDepth: 
@@ -28,10 +31,26 @@ def postOrderTraversalWithOptions(node,tree,currentDepth,maxDepth):
     return nodeList
 
 def getValidSetCardinality(validSetDir, tree, node, node_children):
-
     """
-    Get children node matching info using (pre-geneated) validSet files. 
-    allLevel2Costs.m part 1
+    Get children node matching info using (pre-generated) validSet files. 
+    This function computes the minimal and maximal set cardinality and updates
+    node matching information based on pre-saved valid sets.
+    
+    Args:
+        validSetDir (str): Directory where valid set files are stored.
+        tree (Morphology): The tree structure containing the nodes and their relationships.
+        node (int): The current node ID in the tree whose children are being analyzed.
+        node_children (list): A list of child nodes for the current node.
+
+    Returns:
+        tuple: Contains the following:
+            - minMaximalSetCardinality (int): The minimal cardinality of the node's children.
+            - maxMaximalSetCardinality (int): The maximal cardinality of the node's children.
+            - vs (list): The updated valid set of nodes.
+
+    Notes:
+      - allLevel2Costs.m part 1
+
     """
     
     #get the validset file to load 
@@ -66,10 +85,33 @@ def getValidSetCardinality(validSetDir, tree, node, node_children):
 def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs1, 
                        maxMaximalSetCardinality2, minMaximalSetCardinality2, vs2, 
                        agreement, node_id_index_dict1, node_id_index_dict2):
-  
   """
-  Find match of tree 1 and tree 2 children that has the highest similarity score. 
-  allLevel2Costs.m part 2
+  Find match of tree 1 and tree 2 children that has the highest similarity score 
+  based on pre-computed agreement matrices. 
+
+  This function uses a linear assignment approach to find the optimal match between
+  the child nodes of two trees by maximizing a similarity score. The similarity score 
+  is computed based on a provided agreement matrix.
+
+  Args:
+      maxMaximalSetCardinality1 (int): Maximum cardinality of the set for tree 1.
+      minMaximalSetCardinality1 (int): Minimum cardinality of the set for tree 1.
+      vs1 (list): Valid sets for tree 1, organized by cardinality and other parameters.
+      maxMaximalSetCardinality2 (int): Maximum cardinality of the set for tree 2.
+      minMaximalSetCardinality2 (int): Minimum cardinality of the set for tree 2.
+      vs2 (list): Valid sets for tree 2, organized similarly to tree 1.
+      agreement (dict): Dictionary containing the agreement matrix ('pAgrM') for tree node matching.
+      node_id_index_dict1 (dict): Dictionary mapping node ids to agreement matrix indices for tree 1.
+      node_id_index_dict2 (dict): Dictionary mapping node ids to agreement matrix indices for tree 2.
+
+  Returns:
+      tuple: A tuple containing:
+          - matchingChildren1 (list): List of matched child node ids from tree 1.
+          - matchingChildren2 (list): List of matched child node ids from tree 2.
+          - sim (float): The maximum similarity score for the best match.
+
+  Notes:  
+    - allLevel2Costs.m part 2
   """
 
   sim = -1e-10
@@ -141,10 +183,26 @@ def getMatchingChildren(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs
 
 # HARDCODED VALID SETS
 def getValidSetCardinality_hardcode(valid_set_dict, tree, node, node_children):
-
     """
-    Get children node matching info using (pre-geneated) validSet files. 
-    allLevel2Costs.m part 1
+    Get children node matching info using (pre-generated) validSet files. 
+    This function computes the minimal and maximal set cardinality and updates
+    node matching information based on pre-saved valid sets.
+    
+    Args:
+        valid_set_dict (dict): Dictionary of valid sets.
+        tree (Morphology): The tree structure containing the nodes and their relationships.
+        node (int): The current node ID in the tree whose children are being analyzed.
+        node_children (list): A list of child nodes for the current node.
+
+    Returns:
+        tuple: Contains the following:
+            - minMaximalSetCardinality (int): The minimal cardinality of the node's children.
+            - maxMaximalSetCardinality (int): The maximal cardinality of the node's children.
+            - vs (list): The updated valid set of nodes.
+
+    Notes:
+      - allLevel2Costs.m part 1
+
     """
     #get the validset file to load 
     fileName = ''
@@ -176,11 +234,34 @@ def getValidSetCardinality_hardcode(valid_set_dict, tree, node, node_children):
 
 def getMatchingChildren_hardcode(maxMaximalSetCardinality1, minMaximalSetCardinality1, vs1, 
                        maxMaximalSetCardinality2, minMaximalSetCardinality2, vs2, 
-                       agreement, node_id_index_dict1, node_id_index_dict2):
-  
+                       agreement, node_id_index_dict1, node_id_index_dict2): 
   """
-  Find match of tree 1 and tree 2 children that has the highest similarity score. 
-  allLevel2Costs.m part 2
+  Find match of tree 1 and tree 2 children that has the highest similarity score 
+  based on pre-computed agreement matrices. 
+
+  This function uses a linear assignment approach to find the optimal match between
+  the child nodes of two trees by maximizing a similarity score. The similarity score 
+  is computed based on a provided agreement matrix.
+
+  Args:
+      maxMaximalSetCardinality1 (int): Maximum cardinality of the set for tree 1.
+      minMaximalSetCardinality1 (int): Minimum cardinality of the set for tree 1.
+      vs1 (list): Valid sets for tree 1, organized by cardinality and other parameters.
+      maxMaximalSetCardinality2 (int): Maximum cardinality of the set for tree 2.
+      minMaximalSetCardinality2 (int): Minimum cardinality of the set for tree 2.
+      vs2 (list): Valid sets for tree 2, organized similarly to tree 1.
+      agreement (dict): Dictionary containing the agreement matrix ('pAgrM') for tree node matching.
+      node_id_index_dict1 (dict): Dictionary mapping node ids to agreement matrix indices for tree 1.
+      node_id_index_dict2 (dict): Dictionary mapping node ids to agreement matrix indices for tree 2.
+
+  Returns:
+      tuple: A tuple containing:
+          - matchingChildren1 (list): List of matched child node ids from tree 1.
+          - matchingChildren2 (list): List of matched child node ids from tree 2.
+          - sim (float): The maximum similarity score for the best match.
+
+  Notes:  
+    - allLevel2Costs.m part 2
   """
 
   sim = -1e-10
@@ -252,7 +333,20 @@ def getMatchingChildren_hardcode(maxMaximalSetCardinality1, minMaximalSetCardina
 
 # MAKE HARDCODED VALID SETS JSON 
 def generate_combinations(n, child_options=['0', '2'], prefix='', combos=None):
-    #generate combos of n children where the options for how many children they each have (grandchildren of main node) are child_options
+    """
+    Generate combos of n children where the options for how many children they each 
+    have (grandchildren of main node) are child_options
+
+    Parameters:
+      n (int): Number of child nodes.
+      child_options (list, optional): Options for the number of grandchildren each child can have.
+      prefix (str, optional): Prefix for the combinations. Defaults to an empty string.
+      combos (list, optional): Accumulates the combinations during recursion.
+
+    Returns:
+      list: A list of string combinations.
+    
+    """
     if combos is None:
         combos = []
     if n == 0:
@@ -263,7 +357,19 @@ def generate_combinations(n, child_options=['0', '2'], prefix='', combos=None):
     return combos
 
 def _convert_numpy(obj):
-    # Convert NumPy array to list, which is a JSON-serializable format
+    """
+    Convert NumPy array to a list, which is a JSON-serializable format
+
+    Parameters:
+      obj: The object to be converted. If it's a NumPy array, it will be converted to a list.
+
+    Returns:
+      list: The NumPy array as a Python list.
+
+    Raises:
+      TypeError: If the object is not a NumPy array.
+    
+    """
     if isinstance(obj, np.ndarray):
         return obj.tolist()  # Convert NumPy array to Python list
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
@@ -271,11 +377,15 @@ def _convert_numpy(obj):
 def save_valid_sets(validSetDir, 
                     valid_set_dict_path, 
                     combos):
-    
-    # Hardcode the valid sets. 
-    # Load the valid sets from pre-made matlab valid set files, 
-    # convert them to python dicts and save as a json. 
+    """
+    Load pre-made MATLAB valid set files, convert them to Python dicts, and save as a JSON.
 
+    Parameters:
+      validSetDir (str): Directory where the valid set MATLAB files are located.
+      valid_set_dict_path (str): Path to save the JSON file containing valid sets.
+      combos (list): List of valid set names (file names without extension).
+    
+    """
     #assemble valid sets dict
     validSet_dict = {}  
     for combo in combos: 
@@ -293,7 +403,15 @@ def save_valid_sets(validSetDir,
         json.dump(validSet_dict, f, default=_convert_numpy)
 
 def load_valid_sets(valid_set_dict_path):
-    #Load a dictionary of hardcoded valid sets
+    """
+    Load a dictionary of hardcoded valid sets from a JSON file.
+
+    Parameters:
+      valid_set_dict_path (str): Path to the JSON file containing the valid sets.
+
+    Returns:
+      dict: Dictionary of valid sets loaded from the JSON file.
+    """
     with open(valid_set_dict_path) as f:
         valid_set_dict = json.load(f)
     return valid_set_dict

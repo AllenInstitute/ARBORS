@@ -9,12 +9,18 @@ from tree_comparison.cpp.quantized_convex_matching import quantized_convex_match
 
 def rotate_morphology(morphology, angle, axis=1):
     """
-    Rotate morphology around an axis.
+    Rotate a morphology object around a specified axis.
 
-    :param morph: neuron_morphology Morphology object
-    :param angle: angle to rotate in Radians. clockwise direction when viewed from the positive y-axis towards the positive x-axis (right-hand rule convention)
-    :param axis: axis to rotate around (0=x, 1=y, 2=z)
-    :return: rotated neuron_morphology Morphology object 
+    Parameters:
+        morph (Morphology): Morphology object to rotate.
+        angle (float): Rotation angle in radians. 
+                       Rotation follows the right-hand rule: clockwise when viewed 
+                       from the positive y-axis towards the positive x-axis.
+        axis (int): Axis to rotate around (0 = x, 1 = y, 2 = z).
+
+    Returns:
+        Morphology: Rotated Morphology object.
+
     """
     rotation_affine = AffineTransform(affine_from_transform(rotation_from_angle(angle, axis)))
     rotated_morphology = rotation_affine.transform_morphology(morphology) # if you need the original object to remain unchanged do morph.clone()
@@ -22,6 +28,19 @@ def rotate_morphology(morphology, angle, axis=1):
     return rotated_morphology
 
 def ensure_flat_list(item):
+    """
+    Ensure the input is a flat list.
+
+    Parameters:
+        item: Input to process, can be a list, integer, or other type.
+
+    Returns:
+        list or original input:
+        - A single nested list is flattened.
+        - A single integer is wrapped in a list.
+        - Other types are returned as-is.
+
+    """
     if isinstance(item, list):
         if len(item) == 1 and isinstance(item[0], list): return item[0]  # Extract the inner list
         else: return item  # Already in the desired form
@@ -30,7 +49,16 @@ def ensure_flat_list(item):
 
 def compute_nDistance_matrix(raw_morphology):
     """
-    Will get the path distance between all irreducible nodes of a subtree.
+    Compute the path distance matrix between all irreducible nodes of a subtree.
+
+    Parameters:
+        raw_morphology (Morphology): A morphology object containing the structure of the neuron.
+
+    Returns:
+        tuple:
+            - ndist_matrix (numpy.ndarray): A square matrix where each entry (i, j) represents 
+            the path distance between two irreducible nodes. The distance is doubled for symmetry.
+            - node_id_index_dict (dict): A mapping from node IDs to their corresponding indices in the distance matrix.
 
     """
 
@@ -42,7 +70,6 @@ def compute_nDistance_matrix(raw_morphology):
         soma_list = [n for n in raw_morphology.nodes() if n['parent'] == -1]
         if len(soma_list) != 1:
             print("Invalid Number of somas (0 or >1)")
-            print("Noneeeeee")
         else:
             soma = soma_list[0]
     if soma not in irreducible_nodes and soma:
@@ -79,7 +106,17 @@ def compute_nDistance_matrix(raw_morphology):
 
 def preOrderTraversal(morphology, st_node):
     """
-    Remember we are returning node ids where as Uygars code returns node indicies
+    Perform a pre-order traversal of the morphology starting from the specified node.
+
+    Parameters:
+        morphology (Morphology): A Morphology object.
+        st_node (dict): The starting node for the traversal.
+
+    Returns:
+        numpy.ndarray: A 2D array where each row contains:
+            - Node ID (int): The ID of the visited node.
+            - Number of downstream nodes (int): The count of nodes downstream from the visited node, excluding itself.
+
     """
     visited = []
     num_downstream_nodes = []
@@ -100,7 +137,18 @@ def preOrderTraversal(morphology, st_node):
     return res
 
 def find_leaves(morphology, st_node):
-    "Get the leaves/tip nodes of a morphology"
+    """
+    Return leaf nodes of a Morphology object. 
+
+    Parameters:
+        morphology (Morphology): A Morphology object.
+        st_node (dict): The starting node for the traversal.
+
+    Returns:
+        Returns:
+        list: A list of leaf nodes.
+
+    """
     nodes_down,_ = dfs_tree(morphology, st_node)
     leaves = [n for n in nodes_down if morphology.get_children(n)==[]]
     return leaves
@@ -127,6 +175,45 @@ def linearAssignment_matchingNodes(agreement,
                                    valid_set_dict,
                                    valid_set_dir,
                                    hardcoded_vs):
+    
+    """
+    Matches nodes from two trees based on a given agreement matrix and other tree-related data. The function performs 
+    linear assignment to match nodes between two trees, calculates similarity based on different criteria, and updates 
+    the agreement matrix accordingly. 
+
+    Parameters:
+        agreement (dict): Dictionary containing agreement matrices and other related data.
+        node1 (dict): The node to be compared from tree1 - match it's children with the children of node2.
+        node1_children (list): List of node1 children - nodes to be matched with node2_children.
+        node1_parent_id_matrix_idx (int): Index of node1's parent in the distance matrix.
+        ndDistanceMatrix1 (numpy.ndarray): Tree1 distance matrix.
+        preON1 (numpy.ndarray): Preorder traversal of tree1 subtree (node1 & node1_children).
+        tree1 (Morphology): Tree1 Morphology object.
+        node_id_index_dict1 (dict): Mapping of Morphology node IDs to distance matrix indices for tree1.
+        node2 (dict): The node to be compared from tree2 - match it's children with the children of node1.
+        node2_children (list): List of node2 children - nodes to be matched with node1_children.
+        node2_parent_id_matrix_idx (int): Index of node2's parent in the distance matrix.
+        ndDistanceMatrix2 (numpy.ndarray): Tree2 distance matrix.
+        preON2 (numpy.ndarray): Preorder traversal of tree2 subtree (node2 & node2_children).
+        tree2 (Morphology): Tree2 Morphology object.
+        node_id_index_dict2 (dict): Mapping of Morphology node IDs to distance matrix indices for tree2.
+        tree1_paths (str): Path data from node1 to node1's irreducible parent.
+        tree2_paths (str): Path data from node2 to node2's irreducible parent.
+        maxDepth (int): Maximum depth for matching (1 or 2). Affects the matching strategy.
+        simFunc (str): The similarity function to use ('length' or 'convex').
+        valid_set_dict (dict): Predefined valid sets for matching (if hardcoded_vs == True).
+        valid_set_dir (str): Directory containing valid sets for matching (if hardcoded_vs == False).
+        hardcoded_vs (bool): Flag indicating whether to use hardcoded valid sets.
+
+    Returns:
+        dict: Updated agreement dictionary with the modified agreement matrices and node matches.
+    
+    Notes:
+    - The function uses linear sum assignment to find the best match between child nodes based on agreement matrices.
+    - The final similarity is calculated using different methods depending on the `maxDepth` and `simFunc` parameters.
+    - The agreement matrix is updated based on the node matches and similarity scores.
+
+    """
 
     node1_children_array = np.array(node1_children)
     node2_children_array = np.array(node2_children)
@@ -262,18 +349,6 @@ def linearAssignment_matchingNodes(agreement,
                             edge_lengths1, edge_orientations1, edge_areas1, pillars1 = edges_between(tree1.node_by_id(n1), tree1.node_by_id(node1['parent']), tree1, tree1_paths)
                             edge_lengths2, edge_orientations2, edge_areas2, pillars2 = edges_between(tree2.node_by_id(n2), tree2.node_by_id(node2['parent']), tree2, tree2_paths)
 
-
-                            # print('n1: {}, n2: {}'.format(n1, n2))
-                            # print('p1: {}, p2: {}'.format(node1['parent'], node2['parent']))
-                            # print('edge_lengths1: {}'.format(len(edge_lengths1)))
-                            # print('edge_orientations1: {}'.format(len(edge_orientations1)))
-                            # print('edge_areas1: {}'.format(len(edge_areas1)))
-                            # print('pillars1: {}'.format(len(pillars1)))
-                            # print('edge_lengths2: {}'.format(len(edge_lengths2)))
-                            # print('edge_orientations2: {}'.format(len(edge_orientations2)))
-                            # print('edge_areas2: {}'.format(len(edge_areas2)))
-                            # print('pillars2: {}'.format(len(pillars2)))
-
                             cvxSim = quantized_convex_matching(edge_lengths1, edge_orientations1, edge_areas1, pillars1, edge_lengths2, edge_orientations2, edge_areas2, pillars2)
                             thisPlusSimilarity = agreement['agrM'][n1_idx, n2_idx] + cvxSim
 
@@ -291,7 +366,16 @@ def linearAssignment_matchingNodes(agreement,
     return agreement
 
 def remove_duplicate_nodes(nodes):
-    #remove duplicate nodes from a tree
+    """
+    Remove duplicate node ids from a tree.
+
+    Parameters:
+        nodes (list): A list of node dictionaries, where each dictionary contains an 'id' key.
+
+    Returns:
+        list: A list of nodes with duplicates removed, preserving the node order of the input list.
+
+    """
     seen_ids = set()
     unique_nodes = []
     
@@ -304,10 +388,14 @@ def remove_duplicate_nodes(nodes):
 
 def flatten(nested_list):
     """
-    Recursively flattens a nested list.
+    Recursively flatten a nested list.
     
-    :param nested_list: A list (potentially nested).
-    :return: A flat list.
+    Paremeters: 
+        nested_list (list): A list (potentially nested).
+
+    Returns: 
+        list: A flat list.
+
     """
     flat_list = []
     for item in nested_list:
