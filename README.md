@@ -3,9 +3,9 @@
 This package supports the quantitative comparison of tree topology.
 
 # Installation instructions
-Install Boost: https://www.boost.org/
+1. Install Boost: https://www.boost.org/
 
-Setup a conda environment with the proper requirements and clone the repo
+2. Setup a conda environment with the proper requirements and clone the repo
 ```bash
 conda create -n tree_compare_env python=3.9  
 conda activate tree_compare_env    
@@ -14,12 +14,12 @@ pip install pybind11
 git clone git@github.com:sarahwallingbell/tree_comparison.git
 ```
 
-Ensure correct path to Boost in setup.py
+3. Ensure correct path to Boost in setup.py
 ```bash
 extra_compile_args=['-I/path/to/boost/install']
 ```
 
-Pip install tree comparison 
+4. Pip install tree comparison 
 ```bash
 cd tree_comparison
 python setup.py build_ext --inplace
