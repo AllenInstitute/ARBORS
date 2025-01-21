@@ -64,6 +64,7 @@ tree-compare
 --compartments 3 
 --orientations 0 90 180 270 
 --valid_set_dict path/to/valid_set.json
+--slurm_virtual_env my_tree_compare_env
 ```
 
 # Statement of Support
