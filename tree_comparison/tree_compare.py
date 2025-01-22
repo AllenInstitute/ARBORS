@@ -31,7 +31,7 @@ class IO_Schema(ags.ArgSchema):
     orientations = ags.fields.List(ags.fields.Float, metadata={'description' : "List of rotations in degrees for Tree2 (around y axis)"}, dump_default=[0])
 
     valid_set_dir = ags.fields.InputDir(metadata={'description' : "Directory with valid set files"}, dump_default=str(files('tree_comparison') / "data"))
-    valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet.json'))
+    valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet_mouse_inh_viz_ctx.json'))
    
     partition_length = ags.fields.Float(metadata={'description' : "Partition length for downsampling tree branch"}, dump_default=1/2000)
     angle_threshold = ags.fields.Float(metadata={'description' : "Angle threshold for downsampling tree branch"}, dump_default=pi/9)
