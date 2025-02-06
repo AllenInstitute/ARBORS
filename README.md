@@ -10,7 +10,7 @@ This package supports the quantitative comparison of tree topology.
 conda create -n tree_compare_env python=3.9  
 conda activate tree_compare_env    
 pip install pybind11    
-git clone git@github.com:sarahwallingbell/tree_comparison.git
+git clone git@github.com:AllenInstitute/tree_comparison.git
 ```
 
 3. Ensure correct path to Boost in setup.py
