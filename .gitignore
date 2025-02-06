@@ -1,22 +1,13 @@
 .ipynb_checkpoints
 tree_comparison.egg-info
 
-*/TestTrees/*
-/TestTrees/
-TestTrees
-TestTrees/*
 testing/
-/misc
-forest/
-archive/
-todo/
-temp/
-# *.swc
+misc/
+old/
 *.pdf
 *.ipynb
 *.csv
 *old.py
-# *.json
 core.*
 *.mat
 
