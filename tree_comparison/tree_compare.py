@@ -39,9 +39,12 @@ class IO_Schema(ags.ArgSchema):
 
     downsample_spacing = ags.fields.Float(metadata={'description' : "New node spacing for downsampling tree"}, dump_default=None, allow_none=True)
 
+    relative_branch_check = ags.fields.Bool(metadata={'description' : "Whether to omit comparison of differently lengthed branches"}, dump_default=True)
+    relative_branch_threshold = ags.fields.Float(metadata={'description' : "Relative difference in branch lengths to omit comparison"}, dump_default=0.2)
 
 def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, orientation, valid_set_dict, 
-                      partition_length, angle_threshold, segment_threshold, valid_set_dir=None, downsample_spacing=None):
+                      partition_length, angle_threshold, segment_threshold, relative_branch_check, relative_branch_threshold,
+                      valid_set_dir=None, downsample_spacing=None):
 
     """
     Generate a similarity score for two input SWC files.
@@ -121,6 +124,9 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         if not root1: root1 = [n for n in tree1.nodes() if n['parent'] == -1][0]
         if not root2: root2 = [n for n in tree2.nodes() if n['parent'] == -1][0]
 
+        root1 = [n for n in tree1.nodes() if n['parent'] == -1][0]
+        root2 = [n for n in tree2.nodes() if n['parent'] == -1][0]
+
         postOrderNodes1,_ = dfs_tree(tree1, root1)
         postOrderNodes1.reverse()
         postOrderNodes2,_ = dfs_tree(tree2, root2)
@@ -178,6 +184,7 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                     node2_parent_id_matrix_idx = None
 
                 if (node1_children != []) and (node2_children != []):
+                    #Comparing two branch nodes (nodes with children)
 
                     subtreeRootPos1 = np.where(preOrderNodes1[:, 0] == node1['id'])[0][0]
                     subtreeRootPos2 = np.where(preOrderNodes2[:, 0] == node2['id'])[0][0]
@@ -210,21 +217,24 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                                                                 simFunc=simFunc,
                                                                 valid_set_dict=valid_set_dict,
                                                                 valid_set_dir=valid_set_dir,
-                                                                hardcoded_vs = hardcoded_vs)
+                                                                hardcoded_vs = hardcoded_vs,
+                                                                relative_branch_check = relative_branch_check,
+                                                                relative_branch_threshold = relative_branch_threshold)
                     #Handle case where valid set for a branch pattern is not found. 
                     #TODO in the future we could make it, add it to the hardcoded valid sets file, then continue with the tree comparison. 
                     if agreement == -1: 
                         #branching pattern in tree1 not found in hardcoded (or .mat files if not using hardcoded mode) so skip this tree comparison 
                         #skip all the rotation comparisons, b/c branching pattern issue will be the same for all rots 
-                        return  -1, -1, [], [], []
+                        return -1, -1, -1, [], [], -1, -1, -1, -1
                     if agreement == -2: 
                         #branching pattern in tree2 not found in hardcoded (or .mat files if not using hardcoded mode) so skip this tree comparison 
                         #skip all the rotation comparisons, b/c branching pattern issue will be the same for all rots 
-                        return -2, -2, [], [], []
+                        return -2, -2, -2, [], [], -2, -2, -2, -2
 
                 else:
                     agreement['agrM'][node_1_matrix_index, node_2_matrix_index] = 0
                     if (node1 != root1) and (node2 != root2):
+                        #Comparing two leaf nodes (non-root nodes with no children)
 
                         leaves1 = find_leaves(tree1, node1)
                         leaves1_matrix_indices = [node_id_index_dict1[leaf['id']] for leaf in leaves1]
@@ -243,8 +253,11 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                             lowerNode2 = leaves2[pos2]
 
                             min_dist = min([maxHeight1, maxHeight2])
-                            agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = min_dist
-
+                            max_dist = max([maxHeight1, maxHeight2])
+                            if relative_branch_check and (min_dist/max_dist < relative_branch_threshold):
+                                agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = 0
+                            else:
+                                agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = min_dist
 
                         else: #convex
                             cvxSim = -1e-10
@@ -257,7 +270,13 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                                     if min(sub_arr_1, sub_arr_2) > cvxSim:
                                         edge_lengths1, edge_orientations1, edge_areas1, pillars1 = edges_between(leaf1, tree1.node_by_id(node1['parent']), tree1, tree1_paths)
                                         edge_lengths2, edge_orientations2, edge_areas2, pillars2 = edges_between(leaf2, tree2.node_by_id(node2['parent']), tree2, tree2_paths)
-                                        thisCvxSim = quantized_convex_matching(edge_lengths1, edge_orientations1, edge_areas1, pillars1, edge_lengths2, edge_orientations2, edge_areas2, pillars2)
+                                        
+                                        edge_length1 = np.sum(edge_lengths1)
+                                        edge_length2 = np.sum(edge_lengths2)
+                                        if relative_branch_check and (min(edge_length1, edge_length2) / max(edge_length1, edge_length2) < relative_branch_threshold):
+                                            thisCvxSim = 0 
+                                        else: 
+                                            thisCvxSim = quantized_convex_matching(edge_lengths1, edge_orientations1, edge_areas1, pillars1, edge_lengths2, edge_orientations2, edge_areas2, pillars2)
 
                                         if thisCvxSim > cvxSim:
                                             cvxSim = thisCvxSim
@@ -275,6 +294,7 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                         agreement['agrTypeM'][node_1_matrix_index, node_2_matrix_index] = ((node1 in leaves1) and (node2 in leaves2))
 
                     else:
+                        #Comparing a root/branch and a leaf
                         agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = 0
                         agreement['pAgrNodes'][node_1_matrix_index, node_2_matrix_index][0] = [node1['id']]
                         agreement['pAgrNodes'][node_1_matrix_index, node_2_matrix_index][1] = [node2['id']]
@@ -312,7 +332,9 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         distance = -3
         norm_distance = -3
 
-    return distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2 #matched_nodes_sim
+    print(f'\n\nSCORE: {distance}\n\n')
+
+    return distance, norm_distance, maxAgreement, matched_nodes_tree1, matched_nodes_tree2, num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2 #matched_nodes_sim
 
 def main(args):
 
@@ -329,6 +351,8 @@ def main(args):
               args['partition_length'], 
               args['angle_threshold'], 
               args['segment_threshold'], 
+              args['relative_branch_check'],
+              args['relative_branch_threshold'],
               args['valid_set_dir'],
               args['downsample_spacing']) 
              for orientation in orientations 
@@ -350,7 +374,7 @@ def main(args):
 
     # Save each orientation/compartment result csv
     #TODO find the best rotation comparison here
-    for i, ((distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2, \
+    for i, ((distance, norm_distance, maxAgreement, matched_nodes_tree1, matched_nodes_tree2, \
              num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2), \
              (compartment, orientation)) in enumerate(zip(results, [(compartment, orientation) for orientation in args['orientations'] for compartment in args['compartments']])):
 
@@ -359,6 +383,7 @@ def main(args):
             "orientation": orientation,
             f"distance_score_{compartment}": distance,
             f"distance_score_normalized_{compartment}": norm_distance,
+            f"agreement": maxAgreement,
             f"matched_nodes_tree1_{compartment}": matched_nodes_tree1,
             f"matched_nodes_tree2_{compartment}": matched_nodes_tree2,
             # f"matched_node_edge_similarity_{compartment}": matched_nodes_similarity_pagrm,
