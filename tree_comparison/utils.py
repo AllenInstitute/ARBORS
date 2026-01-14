@@ -174,7 +174,9 @@ def linearAssignment_matchingNodes(agreement,
                                    simFunc,
                                    valid_set_dict,
                                    valid_set_dir,
-                                   hardcoded_vs):
+                                   hardcoded_vs,
+                                   relative_branch_check,
+                                   relative_branch_threshold):
     
     """
     Matches nodes from two trees based on a given agreement matrix and other tree-related data. The function performs 
@@ -302,10 +304,8 @@ def linearAssignment_matchingNodes(agreement,
             agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] = \
             ensure_flat_list(agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1]) + ensure_flat_list([agreement['pAgrNodes'][matchingChildren1[i], matchingChildren2[i]][1]])
         
-        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] = \
-        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] + [node1['id']]
-        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] = \
-        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] + [node2['id']]
+        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] = agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][0] + [node1['id']]
+        agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] = agreement['agrNodes'][node1_matrix_idx, node2_matrix_idx][1] + [node2['id']]
 
     else:
         agreement['agrM'][node1_matrix_idx, node2_matrix_idx] = maxSimilarity
@@ -345,7 +345,14 @@ def linearAssignment_matchingNodes(agreement,
                     simpleBound2 = agreement['pAgrM'][n1_idx, n2_idx] + max_val
 
                     if (n1 == node1['id'] & n2 == node2['id']) or (maxPlusSimilarity < (min(simpleBound, simpleBound2) * 0.9999)):
-                        if simFunc != "length": #convex
+
+                        #If branch lengths between n1-Node1Parent and between n2-Node2Parent are *too* different, don't compare them
+                        branch_max_val = max(ndDistanceMatrix1[n1_idx, node1_parent_id_matrix_idx],
+                                            ndDistanceMatrix2[n2_idx, node2_parent_id_matrix_idx])
+                        if relative_branch_check and (min_val / branch_max_val < relative_branch_threshold): 
+                            thisPlusSimilarity = 0
+
+                        elif simFunc != "length": #convex
                             edge_lengths1, edge_orientations1, edge_areas1, pillars1 = edges_between(tree1.node_by_id(n1), tree1.node_by_id(node1['parent']), tree1, tree1_paths)
                             edge_lengths2, edge_orientations2, edge_areas2, pillars2 = edges_between(tree2.node_by_id(n2), tree2.node_by_id(node2['parent']), tree2, tree2_paths)
 
