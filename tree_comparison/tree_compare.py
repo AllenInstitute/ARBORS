@@ -1,5 +1,6 @@
 import os
 import json
+import pickle 
 import ntpath
 import argschema as ags
 import numpy as np
@@ -10,10 +11,10 @@ from tqdm import tqdm
 from neuron_morphology.swc_io import morphology_from_swc
 from neuron_morphology.constants import AXON, BASAL_DENDRITE, APICAL_DENDRITE
 from neuron_morphology.morphology import Morphology
-from morph_utils.modifications import generate_irreducible_morph, resample_morphology
+from morph_utils.modifications import resample_morphology
 from morph_utils.graph_traversal import dfs_tree, get_path_to_root
 from morph_utils.measurements import tree_length
-from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes, rotate_morphology, remove_duplicate_nodes, flatten
+from tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes, rotate_morphology, remove_duplicate_nodes, flatten, generate_irreducible_morph_preserve_order
 from tree_comparison.maxdepthtwo_utils import load_valid_sets
 from tree_comparison.convexsimfunc_utils import get_tree_paths, edges_between
 from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
@@ -87,23 +88,24 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
     tree2_raw = morphology_from_swc(swc_file_2)
 
     #downsample the neurons 
-    num_nodes_before_tree1 = len(tree1_raw.nodes())
-    num_nodes_before_tree2 = len(tree2_raw.nodes())
     if (downsample_spacing is not None) and (downsample_spacing > 0):
         tree1_raw = resample_morphology(tree1_raw, downsample_spacing)
         tree2_raw = resample_morphology(tree2_raw, downsample_spacing)
-    num_nodes_after_tree1 = len(tree1_raw.nodes())
-    num_nodes_after_tree2 = len(tree2_raw.nodes())
+        #TODO save mapping between pre and post downsample node ids
 
     #only keep nodes compartment type (if a tree doesn't have nodes of this type, maxAgreement = 0 and skip comp)
+    tree1_order_ids = [n['id'] for n in tree1_raw.nodes()]
     tree1_comp_leaves = tree1_raw.get_leaf_nodes(node_types=compartments)
     tree1_comp_leaves_to_root = [get_path_to_root(leaf, tree1_raw) for leaf in tree1_comp_leaves]
     tree1_raw = remove_duplicate_nodes(flatten(tree1_comp_leaves_to_root))
+    tree1_raw.sort(key=lambda n: tree1_order_ids.index(n['id']))
     tree1_raw = Morphology(tree1_raw, node_id_cb=lambda node: node["id"], parent_id_cb=lambda node: node["parent"])
 
+    tree2_order_ids = [n['id'] for n in tree2_raw.nodes()]
     tree2_comp_leaves = tree2_raw.get_leaf_nodes(node_types=compartments)
     tree2_comp_leaves_to_root = [get_path_to_root(leaf, tree2_raw) for leaf in tree2_comp_leaves]
     tree2_raw = remove_duplicate_nodes(flatten(tree2_comp_leaves_to_root))
+    tree2_raw.sort(key=lambda n: tree2_order_ids.index(n['id']))
     tree2_raw = Morphology(tree2_raw, node_id_cb=lambda node: node["id"], parent_id_cb=lambda node: node["parent"])
 
     if tree1_raw and tree2_raw:
@@ -116,13 +118,8 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         tree1_length = round(tree_length(tree1_raw), 4)
         tree2_length = round(tree_length(tree2_raw), 4)
 
-        tree1 = generate_irreducible_morph(tree1_raw)
-        tree2 = generate_irreducible_morph(tree2_raw)
-
-        # root1, root2 = tree1.get_soma(), tree2.get_soma()
-
-        # if not root1: root1 = [n for n in tree1.nodes() if n['parent'] == -1][0]
-        # if not root2: root2 = [n for n in tree2.nodes() if n['parent'] == -1][0]
+        tree1 = generate_irreducible_morph_preserve_order(tree1_raw)
+        tree2 = generate_irreducible_morph_preserve_order(tree2_raw)
 
         root1 = [n for n in tree1.nodes() if n['parent'] == -1][0]
         root2 = [n for n in tree2.nodes() if n['parent'] == -1][0]
@@ -170,7 +167,7 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
             for node2 in postOrderNodes2:
                 node2_children = tree2.get_children(node2)
                 node_2_matrix_index = node_id_index_dict2[node2['id']]
-            
+
                 if node1 != root1:
                     node1_parent_id = node1['parent']
                     node1_parent_id_matrix_idx = node_id_index_dict1[node1_parent_id]
@@ -184,7 +181,7 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                     node2_parent_id_matrix_idx = None
 
                 if (node1_children != []) and (node2_children != []):
-                    #Comparing two branch nodes (nodes with children)
+                    #Comparing two non-leaf nodes (nodes with children, either branch or root)
 
                     subtreeRootPos1 = np.where(preOrderNodes1[:, 0] == node1['id'])[0][0]
                     subtreeRootPos2 = np.where(preOrderNodes2[:, 0] == node2['id'])[0][0]
@@ -225,23 +222,31 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                     if agreement == -1: 
                         #branching pattern in tree1 not found in hardcoded (or .mat files if not using hardcoded mode) so skip this tree comparison 
                         #skip all the rotation comparisons, b/c branching pattern issue will be the same for all rots 
-                        return  -1, -1, -1, [], [], -1, -1, -1, -1
+                        return -1, -1, -1, {}, {}, {}, [], []
                     if agreement == -2: 
                         #branching pattern in tree2 not found in hardcoded (or .mat files if not using hardcoded mode) so skip this tree comparison 
                         #skip all the rotation comparisons, b/c branching pattern issue will be the same for all rots 
-                        return -2, -2, -2, [], [], -2, -2, -2, -2
+                        return -2, -2, -2, {}, {}, {}, [], []
 
                 else:
+                    #At least one node has no subtree (is a leaf) so the agreement is set to 0. 
                     agreement['agrM'][node_1_matrix_index, node_2_matrix_index] = 0
+                    
                     if (node1 != root1) and (node2 != root2):
-                        #Comparing two leaf nodes (non-root nodes with no children)
-
+                        #Neither is a root. Either leaf x leaf, or leaf x branch.
+                        #Only compute plus agreement matrix (pAgrM), since at least one node has no subtrees. 
+                        
                         leaves1 = find_leaves(tree1, node1)
                         leaves1_matrix_indices = [node_id_index_dict1[leaf['id']] for leaf in leaves1]
 
                         leaves2 = find_leaves(tree2, node2)
                         leaves2_matrix_indices = [node_id_index_dict2[leaf['id']] for leaf in leaves2]
 
+                        #if node1 is a leaf, leaves1 = [node1]
+                        #if node1 is a branch, leaves1 = [all leaves below node1]
+
+                        #Which leaves to match between trees:
+                        #(Is there a pair of long similar paths under these nodes?)
                         if simFunc == "length":
                             sub_arr_1 = ndDistanceMatrix1[leaves1_matrix_indices, node1_parent_id_matrix_idx]
                             sub_arr_2 = ndDistanceMatrix2[leaves2_matrix_indices, node2_parent_id_matrix_idx]
@@ -268,6 +273,7 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                                     sub_arr_2 = ndDistanceMatrix2[node_id_index_dict2[leaf2['id']], node2_parent_id_matrix_idx]
                                     
                                     if min(sub_arr_1, sub_arr_2) > cvxSim:
+                                        #Compute convex similarity between leaf1 and node1's parent, and leaf2 and node2's parent. 
                                         edge_lengths1, edge_orientations1, edge_areas1, pillars1 = edges_between(leaf1, tree1.node_by_id(node1['parent']), tree1, tree1_paths)
                                         edge_lengths2, edge_orientations2, edge_areas2, pillars2 = edges_between(leaf2, tree2.node_by_id(node2['parent']), tree2, tree2_paths)
                                         
@@ -294,7 +300,7 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                         agreement['agrTypeM'][node_1_matrix_index, node_2_matrix_index] = ((node1 in leaves1) and (node2 in leaves2))
 
                     else:
-                        #Comparing a root/branch and a leaf
+                        #Comparing a root/branch and a leaf - completely uncompatable
                         agreement['pAgrM'][node_1_matrix_index, node_2_matrix_index] = 0
                         agreement['pAgrNodes'][node_1_matrix_index, node_2_matrix_index][0] = [node1['id']]
                         agreement['pAgrNodes'][node_1_matrix_index, node_2_matrix_index][1] = [node2['id']]
@@ -312,10 +318,6 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         matched_nodes_tree1 = agreement['agrNodes'][max_matching_node_1_idx][max_matching_node_2_idx][0]
         matched_nodes_tree2 = agreement['agrNodes'][max_matching_node_1_idx][max_matching_node_2_idx][1] 
 
-        #save the plus agreement sim score btw all matched nodes... I think there's a reason why this is NOT correct, need to remember why that is. 
-        # matched_nodes_sim = [agreement['pAgrM'][node_id_index_dict1[matched_nodes_tree1[i]], node_id_index_dict2[matched_nodes_tree2[i]]] for i in range(len(matched_nodes_tree1))]
-        # matched_nodes_sim = [] #TODO add this output
-
         #calculate the distance score 
         distance = tree1_length + tree2_length - maxAgreement
         distance = round(distance, 4)
@@ -325,16 +327,19 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         norm_distance = round(norm_distance, 4)
     else: 
         #at least one tree doesn't have nodes of the specified compartment types, don't compare them. 
-        maxAgreement = 0
-        matched_nodes_tree1 = []
-        matched_nodes_tree2 = []
-        # matched_nodes_sim = []
-        distance = -3
-        norm_distance = -3
+        return -3, -3, -3, {}, {}, {}, [], []
+        # maxAgreement = 0
+        # matched_nodes_tree1 = []
+        # matched_nodes_tree2 = []
+        # distance = -3
+        # norm_distance = -3
+        # agreement = {}
+        # node_id_index_dict1 = {}
+        # node_id_index_dict2 = {}
 
     print(f'\n\nSCORE: {distance}\n\n')
 
-    return distance, norm_distance, maxAgreement, matched_nodes_tree1, matched_nodes_tree2, num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2 #matched_nodes_sim
+    return distance, norm_distance, maxAgreement, agreement, node_id_index_dict1, node_id_index_dict2, matched_nodes_tree1, matched_nodes_tree2
 
 def main(args):
 
@@ -373,28 +378,38 @@ def main(args):
         "segment_threshold": args['segment_threshold']}
 
     # Save each orientation/compartment result csv
-    #TODO find the best rotation comparison here
-    for i, ((distance, norm_distance, maxAgreement, matched_nodes_tree1, matched_nodes_tree2, \
-             num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2), \
-             (compartment, orientation)) in enumerate(zip(results, [(compartment, orientation) for orientation in args['orientations'] for compartment in args['compartments']])):
+    for (distance, norm_distance, maxAgreement, agreement, node_id_index_dict1, node_id_index_dict2, matched_nodes_tree1, matched_nodes_tree2), (compartment, orientation) \
+        in zip(results, [(compartment, orientation) for orientation in args['orientations'] for compartment in args['compartments']]):
 
         result = result_template.copy()
         result.update({
             "orientation": orientation,
             f"distance_score_{compartment}": distance,
             f"distance_score_normalized_{compartment}": norm_distance,
-            f"agreement": maxAgreement,
+            f"max_agreement_{compartment}": maxAgreement,
             f"matched_nodes_tree1_{compartment}": matched_nodes_tree1,
             f"matched_nodes_tree2_{compartment}": matched_nodes_tree2,
-            # f"matched_node_edge_similarity_{compartment}": matched_nodes_similarity_pagrm,
-            f"num_nodes_before_tree1": num_nodes_before_tree1,
-            f"num_nodes_before_tree2": num_nodes_before_tree2, 
-            f"num_nodes_after_tree1": num_nodes_after_tree1,
-            f"num_nodes_after_tree2": num_nodes_after_tree2
         })
         json_path = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_rotate{orientation}_compartment{compartment}.json")
         with open(json_path, "w") as json_file:
             json.dump(result, json_file, indent=4)
+
+        #save agreement matrix
+        agreement_path = os.path.join(
+            args['output_dir'],
+            f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_"
+            f"{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_"
+            f"rotate{orientation}_compartment{compartment}_agreement.pkl"
+        )
+        agreement_data = {
+            'agreement': agreement,
+            'tree1_matched_nodes': matched_nodes_tree1,
+            'tree2_matched_nodes': matched_nodes_tree2,
+            'tree1_id_to_idx': node_id_index_dict1,
+            'tree2_id_to_idx': node_id_index_dict2
+        }
+        with open(agreement_path, "wb") as f:
+            pickle.dump(agreement_data, f)
 
 def console_script():
     module = ags.ArgSchemaParser(schema_type=IO_Schema)
