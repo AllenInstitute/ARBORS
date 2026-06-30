@@ -5,7 +5,7 @@ pandas
 tqdm
 numpy
 argschema
-morph_utils==1.4.6
+morph_utils
 scipy
 pybind11
 more_itertools
