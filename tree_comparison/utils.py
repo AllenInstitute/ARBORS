@@ -1,6 +1,7 @@
 import numpy as np
 from collections import deque
 from scipy.optimize import linear_sum_assignment
+from neuron_morphology.morphology import Morphology
 from neuron_morphology.transforms.affine_transform import AffineTransform, rotation_from_angle, affine_from_transform
 from morph_utils.graph_traversal import bfs_tree, dfs_tree, get_path_to_root, get_path_and_path_dist_between_two_nodes
 from tree_comparison.maxdepthtwo_utils import getValidSetCardinality_hardcode, getMatchingChildren_hardcode, getValidSetCardinality, getMatchingChildren
@@ -411,3 +412,58 @@ def flatten(nested_list):
         else:
             flat_list.append(item)
     return flat_list
+
+def generate_irreducible_morph_preserve_order(morph):
+    """
+    Will generate an irreducible morphology object. The only remaining nodes will be roots,
+    branches and tip nodes. The irreducible nodes remain in the same order as the input morph.
+
+    :param morph: neuron_morphology Morphology object
+    :return: neuron_morphology Morphology object
+    """
+    morph = morph.clone()
+
+    irreducible_nodes = [n for n in morph.nodes() if
+                         (len(morph.get_children(n)) > 1) or (len(morph.get_children(n)) == 0) or (n['parent'] == -1)]
+    soma = morph.get_soma()
+    if not soma:
+        soma_list = [n for n in morph.nodes() if n['parent'] == -1]
+        if len(soma_list) != 1:
+            print("Invalid Number of somas (0 or >1)")
+            return None
+        else:
+            soma = soma_list[0]
+    if soma not in irreducible_nodes and soma:
+        irreducible_nodes.append(morph.get_soma())
+
+    leaves = [n for n in morph.nodes() if len(morph.get_children(n)) == 0]
+    irreducible_nodes_with_topology = []
+    # need to re-assign parent child relationship for only irreducible nodes
+    for leaf_no in leaves:
+        path_to_root = get_path_to_root(leaf_no, morph)
+
+        if leaf_no not in path_to_root:
+            path_to_root.insert(0, leaf_no)
+
+        irreducible_nodes_in_path = [n for n in path_to_root if n in irreducible_nodes]
+
+        for i in range(0, len(irreducible_nodes_in_path) - 1):
+            this_no = irreducible_nodes_in_path[i]
+            next_node_up = irreducible_nodes_in_path[i + 1]
+
+            this_no['parent'] = next_node_up['id']
+            irreducible_nodes_with_topology.append(this_no)
+
+        # add root 
+        next_node_up['type'] = 1
+        irreducible_nodes_with_topology.append(next_node_up)
+
+    # Preserve node order of the original morphology
+    input_order_ids = [n['id'] for n in morph.nodes()]
+    irreducible_nodes_with_topology.sort(key=lambda n: input_order_ids.index(n['id']))
+
+    morph_irreducible = Morphology(irreducible_nodes_with_topology,
+                                   parent_id_cb=lambda x: x['parent'],
+                                   node_id_cb=lambda x: x['id'])
+
+    return morph_irreducible
