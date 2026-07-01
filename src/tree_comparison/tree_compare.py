@@ -16,7 +16,7 @@ from morph_utils.measurements import tree_length
 from src.tree_comparison.utils import compute_nDistance_matrix, find_leaves, preOrderTraversal, linearAssignment_matchingNodes, rotate_morphology, remove_duplicate_nodes, flatten
 from src.tree_comparison.maxdepthtwo_utils import load_valid_sets
 from src.tree_comparison.convexsimfunc_utils import get_tree_paths, edges_between
-from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
+from src.tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
 class IO_Schema(ags.ArgSchema):
     swc_1_path = ags.fields.InputFile(dump_default=None, metadata={'description' : "path to tree1 swc"})
@@ -34,16 +34,13 @@ class IO_Schema(ags.ArgSchema):
     valid_set_dict = ags.fields.InputFile(metadata={'description' : "JSON file with hardcoded valid sets"}, dump_default=os.path.join(str(files('tree_comparison') / "data"), 'validSet_mouse_inh_viz_ctx.json'))
    
     partition_length = ags.fields.Float(metadata={'description' : "Partition length for downsampling tree branch"}, dump_default=1/2000)
-    angle_threshold = ags.fields.Float(metadata={'description' : "Angle threshold for downsampling tree branch"}, dump_default=pi/9)
-    segment_threshold = ags.fields.Float(metadata={'description' : "Segment threshold for downsampling tree branch"}, dump_default=1/200)
-
     downsample_spacing = ags.fields.Float(metadata={'description' : "New node spacing for downsampling tree"}, dump_default=None, allow_none=True)
 
     relative_branch_check = ags.fields.Bool(metadata={'description' : "Whether to omit comparison of differently lengthed branches"}, dump_default=True)
     relative_branch_threshold = ags.fields.Float(metadata={'description' : "Relative difference in branch lengths to omit comparison"}, dump_default=0.2)
 
 def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, orientation, valid_set_dict, 
-                      partition_length, angle_threshold, segment_threshold, relative_branch_check, relative_branch_threshold,
+                      partition_length, relative_branch_check, relative_branch_threshold,
                       valid_set_dir=None, downsample_spacing=None):
 
     """
@@ -56,11 +53,9 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         simFunc (str): Similarity function, either 'length' or 'convex'.
         maxDepth (int): Depth for comparison, either 1 or 2.
         orientation (float): Angle (in degrees) to rotate the second tree (swc_file_2) around the y-axis for comparison.
+        valid_set_dir (str): Path to the directory containing valid set files.
         valid_set_dict (dict): Hardcoded valid sets for when maxDepth == 2.
         partition_length (float): Length between resampled nodes (used for resampling a branch).
-        angle_threshold (float): Angle threshold between nodes for resampling a branch (currently unused).
-        segment_threshold (float): Threshold for resampling a branch (currently unused).
-        valid_set_dir (str): Path to the directory containing valid set files.
         downsample_spacing (float): Distance between nodes for tree resampling.
 
     Returns:
@@ -68,11 +63,6 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         float: Normalized cell similarity score.
         list[tuple]: Matched nodes from the first tree (tree1).
         list[tuple]: Matched nodes from the second tree (tree2).
-        int: Number of nodes in the first tree before processing.
-        int: Number of nodes in the second tree before processing.
-        int: Number of nodes in the first tree after processing.
-        int: Number of nodes in the second tree after processing.
-        #TODO list[float]: Matched node similarity scores.
     """
     #load hardcoded valid set dict if given for max depth = 2
     if (maxDepth == 2) and (valid_set_dict is not None): 
@@ -87,13 +77,9 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
     tree2_raw = morphology_from_swc(swc_file_2)
 
     #downsample the neurons 
-    num_nodes_before_tree1 = len(tree1_raw.nodes())
-    num_nodes_before_tree2 = len(tree2_raw.nodes())
     if (downsample_spacing is not None) and (downsample_spacing > 0):
         tree1_raw = resample_morphology(tree1_raw, downsample_spacing)
         tree2_raw = resample_morphology(tree2_raw, downsample_spacing)
-    num_nodes_after_tree1 = len(tree1_raw.nodes())
-    num_nodes_after_tree2 = len(tree2_raw.nodes())
 
     #only keep nodes compartment type (if a tree doesn't have nodes of this type, maxAgreement = 0 and skip comp)
     tree1_comp_leaves = tree1_raw.get_leaf_nodes(node_types=compartments)
@@ -119,11 +105,6 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         tree1 = generate_irreducible_morph(tree1_raw)
         tree2 = generate_irreducible_morph(tree2_raw)
 
-        # root1, root2 = tree1.get_soma(), tree2.get_soma()
-
-        # if not root1: root1 = [n for n in tree1.nodes() if n['parent'] == -1][0]
-        # if not root2: root2 = [n for n in tree2.nodes() if n['parent'] == -1][0]
-
         root1 = [n for n in tree1.nodes() if n['parent'] == -1][0]
         root2 = [n for n in tree2.nodes() if n['parent'] == -1][0]
 
@@ -136,9 +117,7 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         preOrderNodes2 = preOrderTraversal(tree2, root2)
 
         partition_length_tree1 = partition_length*tree1_length 
-        # segment_threshold_tree1 = segment_threshold*tree1_length
         partition_length_tree2 = partition_length*tree2_length 
-        # segment_threshold_tree2 = segment_threshold*tree2_length
 
         tree1_paths = get_tree_paths(tree1_raw, partition_length_tree1)
         tree2_paths = get_tree_paths(tree2_raw, partition_length_tree2)
@@ -225,11 +204,11 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
                     if agreement == -1: 
                         #branching pattern in tree1 not found in hardcoded (or .mat files if not using hardcoded mode) so skip this tree comparison 
                         #skip all the rotation comparisons, b/c branching pattern issue will be the same for all rots 
-                        return  -1, -1, -1, [], [], -1, -1, -1, -1
+                        return  -1, -1, [], []
                     if agreement == -2: 
                         #branching pattern in tree2 not found in hardcoded (or .mat files if not using hardcoded mode) so skip this tree comparison 
                         #skip all the rotation comparisons, b/c branching pattern issue will be the same for all rots 
-                        return -2, -2, -2, [], [], -2, -2, -2, -2
+                        return -2, -2, [], []
 
                 else:
                     agreement['agrM'][node_1_matrix_index, node_2_matrix_index] = 0
@@ -312,10 +291,6 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         matched_nodes_tree1 = agreement['agrNodes'][max_matching_node_1_idx][max_matching_node_2_idx][0]
         matched_nodes_tree2 = agreement['agrNodes'][max_matching_node_1_idx][max_matching_node_2_idx][1] 
 
-        #save the plus agreement sim score btw all matched nodes... I think there's a reason why this is NOT correct, need to remember why that is. 
-        # matched_nodes_sim = [agreement['pAgrM'][node_id_index_dict1[matched_nodes_tree1[i]], node_id_index_dict2[matched_nodes_tree2[i]]] for i in range(len(matched_nodes_tree1))]
-        # matched_nodes_sim = [] #TODO add this output
-
         #calculate the distance score 
         distance = tree1_length + tree2_length - maxAgreement
         distance = round(distance, 4)
@@ -325,16 +300,14 @@ def compare_two_trees(swc_file_1, swc_file_2, compartments, simFunc, maxDepth, o
         norm_distance = round(norm_distance, 4)
     else: 
         #at least one tree doesn't have nodes of the specified compartment types, don't compare them. 
-        maxAgreement = 0
-        matched_nodes_tree1 = []
-        matched_nodes_tree2 = []
-        # matched_nodes_sim = []
         distance = -3
         norm_distance = -3
+        matched_nodes_tree1 = []
+        matched_nodes_tree2 = []
 
     print(f'\n\nSCORE: {distance}\n\n')
 
-    return distance, norm_distance, maxAgreement, matched_nodes_tree1, matched_nodes_tree2, num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2 #matched_nodes_sim
+    return distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2
 
 def main(args):
 
@@ -349,8 +322,6 @@ def main(args):
               orientation, 
               args['valid_set_dict'], 
               args['partition_length'], 
-              args['angle_threshold'], 
-              args['segment_threshold'], 
               args['relative_branch_check'],
               args['relative_branch_threshold'],
               args['valid_set_dir'],
@@ -368,14 +339,11 @@ def main(args):
         "file2": args['swc_2_path'],
         "similarity_function": args['similarity_function'],
         "max_depth": args['max_depth'],
-        "partition_length": args['partition_length'],
-        "angle_threshold": args['angle_threshold'],
-        "segment_threshold": args['segment_threshold']}
+        "partition_length": args['partition_length']}
 
     # Save each orientation/compartment result csv
     #TODO find the best rotation comparison here
-    for i, ((distance, norm_distance, maxAgreement, matched_nodes_tree1, matched_nodes_tree2, \
-             num_nodes_before_tree1, num_nodes_before_tree2, num_nodes_after_tree1, num_nodes_after_tree2), \
+    for i, ((distance, norm_distance, matched_nodes_tree1, matched_nodes_tree2), \
              (compartment, orientation)) in enumerate(zip(results, [(compartment, orientation) for orientation in args['orientations'] for compartment in args['compartments']])):
 
         result = result_template.copy()
@@ -383,14 +351,8 @@ def main(args):
             "orientation": orientation,
             f"distance_score_{compartment}": distance,
             f"distance_score_normalized_{compartment}": norm_distance,
-            f"agreement": maxAgreement,
             f"matched_nodes_tree1_{compartment}": matched_nodes_tree1,
             f"matched_nodes_tree2_{compartment}": matched_nodes_tree2,
-            # f"matched_node_edge_similarity_{compartment}": matched_nodes_similarity_pagrm,
-            f"num_nodes_before_tree1": num_nodes_before_tree1,
-            f"num_nodes_before_tree2": num_nodes_before_tree2, 
-            f"num_nodes_after_tree1": num_nodes_after_tree1,
-            f"num_nodes_after_tree2": num_nodes_after_tree2
         })
         json_path = os.path.join(args['output_dir'], f"{ntpath.basename(args['swc_1_path']).rsplit('.',1)[0]}_{ntpath.basename(args['swc_2_path']).rsplit('.',1)[0]}_rotate{orientation}_compartment{compartment}.json")
         with open(json_path, "w") as json_file:

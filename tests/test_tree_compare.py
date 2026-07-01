@@ -36,8 +36,6 @@ class TestTreeCompare(unittest.TestCase):
                         orientation=case["params"]["orientation"],
                         valid_set_dict=self.valid_set_dict,
                         partition_length=0.0005,
-                        angle_threshold=0.3490658503988659,
-                        segment_threshold=0.005,
                         downsample_spacing=5.0,
                         relative_branch_check = False,
                         relative_branch_threshold = -1
