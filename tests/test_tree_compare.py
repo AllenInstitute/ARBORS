@@ -1,7 +1,7 @@
 import unittest
 import os
 from importlib.resources import files
-from tree_comparison.tree_compare import compare_two_trees
+from src.tree_comparison.tree_compare import compare_two_trees
 from neuron_morphology.constants import AXON, BASAL_DENDRITE
 
 
@@ -38,7 +38,9 @@ class TestTreeCompare(unittest.TestCase):
                         partition_length=0.0005,
                         angle_threshold=0.3490658503988659,
                         segment_threshold=0.005,
-                        downsample_spacing=5.0
+                        downsample_spacing=5.0,
+                        relative_branch_check = False,
+                        relative_branch_threshold = -1
                     )
 
                     # Tree distance as expected?
