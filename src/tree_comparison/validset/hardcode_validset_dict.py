@@ -32,7 +32,6 @@ def _convert_numpy(obj):
 
 
 def hardcode_valid_sets(validSetDir, valid_set_dict_path, combos):
-
     # assemble valid sets dict
     validSet_dict = {}
     for combo in combos:
@@ -50,7 +49,6 @@ def hardcode_valid_sets(validSetDir, valid_set_dict_path, combos):
 
 
 def main(args):
-
     hardcode_valid_sets(
         validSetDir=args["vs_root"],
         valid_set_dict_path=args["out_file"],

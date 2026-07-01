@@ -92,4 +92,4 @@ Results are written to the specified output directory.
 
 ## Support
 
-ARBORS is under active development. 
+ARBORS is under active development.

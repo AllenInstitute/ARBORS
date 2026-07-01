@@ -13,10 +13,10 @@ from morph_utils.modifications import generate_irreducible_morph, resample_morph
 from neuron_morphology.constants import APICAL_DENDRITE, AXON, BASAL_DENDRITE
 from neuron_morphology.morphology import Morphology
 from neuron_morphology.swc_io import morphology_from_swc
-from src.tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 from tqdm import tqdm
 
 from src.tree_comparison.convexsimfunc_utils import edges_between, get_tree_paths
+from src.tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 from src.tree_comparison.maxdepthtwo_utils import load_valid_sets
 from src.tree_comparison.utils import (
     compute_nDistance_matrix,
@@ -454,7 +454,6 @@ def compare_two_trees(
 
 
 def main(args):
-
     # Prepare a list of parameters for each orientation and compartment comparison
     orientations = args["orientations"]
     compartments = args["compartments"]
