@@ -65,7 +65,7 @@ arbors \
     --similarity_function convex \
     --max_depth 1 \
     --compartments 3 \
-    --orientations 0 90 180 270 \
+    --orientations 0 \
 ```
 
 Results are written to the specified output directory.
