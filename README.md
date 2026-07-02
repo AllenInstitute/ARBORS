@@ -1,73 +1,92 @@
-# tree comparison
+# ARBORS
 
-This package supports the quantitative comparison of tree topology.
+**Algorithm for Recursive Branch ORganization Similarity**
 
-# Installation instructions
-1. Install Boost: https://www.boost.org/
+*A Python package for quantitative comparison of tree topology.*
 
-2. Setup a conda environment with the proper requirements and clone the repo
+<!-- TODO: add a workflow figure -->
+
+<!-- ![ARBORS overview](docs/images/arbors_overview.png) -->
+
+ARBORS computes similarity scores between trees using recursive node matching algorithms that account for branching topology and geometry. It supports trees represented as SWC files and is particularly well suited for comparing reconstructed neuronal morphologies.
+
+---
+
+## Installation
+
+ARBORS has been tested on **Linux**.
+
+#### 1. Install Boost
+
+Install the Boost C++ headers using your preferred package manager or from: https://www.boost.org/
+
+#### 2. Create a Python environment
+
 ```bash
-conda create -n tree_compare_env python=3.9  
-conda activate tree_compare_env    
-pip install pybind11    
-git clone git@github.com:sarahwallingbell/tree_comparison.git
+conda create -n arbors_env python=3.9
+conda activate arbors_env
+pip install pybind11
 ```
 
-3. Ensure correct path to Boost in setup.py
+#### 3. Clone the repository
+
 ```bash
+git clone git@github.com:AllenInstitute/ARBORS.git
+cd ARBORS
+```
+
+#### 4. Configure Boost
+
+
+Before building, update the Boost include path in `setup.py` with the location of your Boost headers:
+
+```python
 extra_compile_args=['-I/path/to/boost/install']
 ```
 
-4. Pip install tree comparison 
+#### 5. Build and install
+
 ```bash
-cd tree_comparison
 python setup.py build_ext --inplace
-pip install . 
+pip install .
 ```
 
-NOTE:
-The above was tested and works on Linux.
+---
 
-# Scripts
-After installation the following console script will be available to run from the command line of your environment. To see detailed instructions on each script type the name of the SCRIPT_NAME --help
+## Quick Start
 
-## tree-compare 
-Script to take two swc files and compute the tree similarity. 
+Compare the basal dendrites of two SWC files using the convex similarity metric.
 
-# Explanation of some keyword arguments
-This package uses a similarity function to find optimal node matching between two trees, and calculate the resulting similarity. 
-
-**similarity_function**: which similarity function to use in tree node matching. 
-- **length**: compare the length of the matched edges.  
-- **convex**: compare the length *and orientation* of the matched edges. Takes tree topology into account.
-    
-**max_depth**: what depth of subtrees to match nodes between. 
-- **1**: match subtrees to the child depth. 
-- **2**: match subtrees to the grandchild depth. Robust to slight variance in branch labelling. 
-
-**compartments**: which compartments of the tree to compare within.
-
-**orientations**: what orientations (degrees) to compare the trees at if similarity_funtion is convex. 
-
-**valid_set_dict**: a pre-computed dictionary of valid grandchild depth subtree node matches when using max_depth 2. 
-
-# Example Usage
-Compare the basal dendrites of two swc files using the convex similarity function and max depth 2 at four rotations.
-```bash 
-tree-compare 
---swc_1_path path/to/file1.swc 
---swc_2_path path/to/file2.swc 
---output_dir path/to/save/results 
---similarity_function convex 
---max_depth 2 
---compartments 3 
---orientations 0 90 180 270 
---valid_set_dict path/to/valid_set.json
---slurm_virtual_env my_tree_compare_env
+```bash
+arbors \
+    --swc_1_path path/to/file1.swc \
+    --swc_2_path path/to/file2.swc \
+    --output_dir path/to/output \
+    --similarity_function convex \
+    --max_depth 1 \
+    --compartments 3 \
+    --orientations 0 \
 ```
 
-# Statement of Support
-This code is an important part of the internal Allen Institute code base and we are actively using and maintaining it. Issues are encouraged, but because this tool is so central to our mission pull requests might not be accepted if they conflict with our existing plans.
+Results are written to the specified output directory.
+
+
+---
+
+## Key Parameters
+
+| Parameter             | Description                                                                     |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `similarity_function` | Similarity metric used for node matching (`length` or `convex`).                |
+| `max_depth`           | Depth of subtree context used during matching (`1` or `2`).                     |
+| `compartments`        | SWC compartment(s) to compare.                                                  |
+| `orientations`        | Rotation angles (degrees) evaluated when using the `convex` metric.             |
+| `valid_set_dict`      | Precomputed subtree matches for comparisons with `max_depth=2`. |
+
+---
 
 
 
+## Support
+
+ARBORS is under active development.
