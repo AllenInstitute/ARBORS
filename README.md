@@ -16,28 +16,25 @@ ARBORS computes similarity scores between trees using recursive node matching al
 
 ARBORS has been tested on **Linux**.
 
-### Install Boost
+#### 1. Install Boost
 
-Install the Boost C++ headers using your preferred package manager or from:
+Install the Boost C++ headers using your preferred package manager or from: https://www.boost.org/
 
-https://www.boost.org/
-
-### Create a Python environment
+#### 2. Create a Python environment
 
 ```bash
 conda create -n arbors_env python=3.9
 conda activate arbors_env
-pip install pybind11
 ```
 
-### Clone the repository
+#### 3. Clone the repository
 
 ```bash
 git clone git@github.com:AllenInstitute/ARBORS.git
 cd ARBORS
 ```
 
-### Configure Boost
+#### 4. Configure Boost
 
 
 Before building, update the Boost include path in `setup.py` with the location of your Boost headers:
@@ -46,7 +43,7 @@ Before building, update the Boost include path in `setup.py` with the location o
 extra_compile_args=['-I/path/to/boost/install']
 ```
 
-### Build and install
+#### 5. Build and install
 
 ```bash
 python setup.py build_ext --inplace

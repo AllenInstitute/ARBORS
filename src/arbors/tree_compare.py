@@ -61,12 +61,12 @@ class IO_Schema(ags.ArgSchema):
 
     valid_set_dir = ags.fields.InputDir(
         metadata={"description": "Directory with valid set files"},
-        dump_default=str(files("tree_comparison") / "data"),
+        dump_default=str(files("arbors") / "data"),
     )
     valid_set_dict = ags.fields.InputFile(
         metadata={"description": "JSON file with hardcoded valid sets"},
         dump_default=os.path.join(
-            str(files("tree_comparison") / "data"), "validSet_mouse_inh_viz_ctx.json"
+            str(files("arbors") / "data"), "validSet_mouse_inh_viz_ctx.json"
         ),
     )
 
