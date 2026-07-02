@@ -4,7 +4,7 @@ from importlib.resources import files
 
 from neuron_morphology.constants import AXON, BASAL_DENDRITE
 
-from src.tree_comparison.tree_compare import compare_two_trees
+from src.arbors.tree_compare import compare_two_trees
 
 
 class TestTreeCompare(unittest.TestCase):
@@ -12,7 +12,7 @@ class TestTreeCompare(unittest.TestCase):
         tree1 = os.path.join(os.path.dirname(__file__), "test_data", "swc_dir", "601506507.swc")
         tree2 = os.path.join(os.path.dirname(__file__), "test_data", "ref_dir", "898703349.swc")
         self.valid_set_dict = os.path.join(
-            str(files("tree_comparison") / "data"), "validSet_mouse_inh_viz_ctx.json"
+            str(files("arbors") / "data"), "validSet_mouse_inh_viz_ctx.json"
         )
 
         self.test_cases = [

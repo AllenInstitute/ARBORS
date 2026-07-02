@@ -13,15 +13,15 @@ from neuron_morphology.transforms.affine_transform import (
     rotation_from_angle,
 )
 from scipy.optimize import linear_sum_assignment
+from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
-from src.tree_comparison.convexsimfunc_utils import edges_between
-from src.tree_comparison.maxdepthtwo_utils import (
+from src.arbors.convexsimfunc_utils import edges_between
+from src.arbors.maxdepthtwo_utils import (
     getMatchingChildren,
     getMatchingChildren_hardcode,
     getValidSetCardinality,
     getValidSetCardinality_hardcode,
 )
-from tree_comparison.cpp.quantized_convex_matching import quantized_convex_matching
 
 
 def rotate_morphology(morphology, angle, axis=1):
