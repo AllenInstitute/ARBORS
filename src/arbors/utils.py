@@ -14,9 +14,9 @@ from neuron_morphology.transforms.affine_transform import (
 )
 from scipy.optimize import linear_sum_assignment
 
-from src.arbors.cpp.quantized_convex_matching import quantized_convex_matching
-from src.arbors.convexsimfunc_utils import edges_between
-from src.arbors.maxdepthtwo_utils import (
+from arbors.cpp.quantized_convex_matching import quantized_convex_matching
+from arbors.convexsimfunc_utils import edges_between
+from arbors.maxdepthtwo_utils import (
     getMatchingChildren,
     getMatchingChildren_hardcode,
     getValidSetCardinality,

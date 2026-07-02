@@ -4,7 +4,7 @@ from importlib.resources import files
 
 from neuron_morphology.constants import AXON, BASAL_DENDRITE
 
-from src.arbors.tree_compare import compare_two_trees
+from arbors.tree_compare import compare_two_trees
 
 
 class TestTreeCompare(unittest.TestCase):

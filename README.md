@@ -25,6 +25,7 @@ Install the Boost C++ headers using your preferred package manager or from: http
 ```bash
 conda create -n arbors_env python=3.9
 conda activate arbors_env
+pip install pybind11
 ```
 
 #### 3. Clone the repository

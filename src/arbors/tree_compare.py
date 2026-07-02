@@ -13,12 +13,12 @@ from morph_utils.modifications import generate_irreducible_morph, resample_morph
 from neuron_morphology.constants import APICAL_DENDRITE, AXON, BASAL_DENDRITE
 from neuron_morphology.morphology import Morphology
 from neuron_morphology.swc_io import morphology_from_swc
-from src.arbors.cpp.quantized_convex_matching import quantized_convex_matching
+from arbors.cpp.quantized_convex_matching import quantized_convex_matching
 from tqdm import tqdm
 
-from src.arbors.convexsimfunc_utils import edges_between, get_tree_paths
-from src.arbors.maxdepthtwo_utils import load_valid_sets
-from src.arbors.utils import (
+from arbors.convexsimfunc_utils import edges_between, get_tree_paths
+from arbors.maxdepthtwo_utils import load_valid_sets
+from arbors.utils import (
     compute_nDistance_matrix,
     find_leaves,
     flatten,
