@@ -66,7 +66,6 @@ arbors \
     --max_depth 1 \
     --compartments 3 \
     --orientations 0 90 180 270 \
-    --slurm_virtual_env arbors_env
 ```
 
 Results are written to the specified output directory.
