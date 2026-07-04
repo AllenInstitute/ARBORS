@@ -1,14 +1,14 @@
 # ARBORS
 
-**Algorithm for Recursive Branch ORganization Similarity**
+**Algorithm for Branch Organization Similarity**
 
-*A Python package for quantitative comparison of tree topology.*
+*A Python package for quantitative comparison of tree morphology.*
 
 <!-- TODO: add a workflow figure -->
 
 <!-- ![ARBORS overview](docs/images/arbors_overview.png) -->
 
-ARBORS computes similarity scores between trees using recursive node matching algorithms that account for branching topology and geometry. It supports trees represented as SWC files and is particularly well suited for comparing reconstructed neuronal morphologies.
+ARBORS computes a similarity score between two trees based on relative topology and geometry. It supports trees represented as SWC files and is particularly well suited for comparing reconstructed neuronal morphologies.
 
 ---
 
@@ -87,6 +87,6 @@ Results are written to the specified output directory.
 
 
 
-## Support
+## Attribution
 
-ARBORS is under active development.
+This software is developed by Sarah Walling-Bell, building on earlier Matlab and Python implementations by Matt Mallory and Uygar Sümbül. Please check for updates.
