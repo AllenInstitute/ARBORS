@@ -89,4 +89,4 @@ Results are written to the specified output directory.
 
 ## Attribution
 
-This software is developed by Sarah Walling-Bell, building on earlier Matlab and Python implementations by Matt Mallory and Uygar Sümbül. Please check for updates.
+This software is developed by Sarah Walling-Bell, building on earlier Matlab and Python implementations by Uygar Sümbül and Matt Mallory. Please check for updates.
